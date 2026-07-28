@@ -11,6 +11,18 @@ public:
 
         setAudioChannels(1, 2);
 
+        configureNavigationIcons();
+
+        navigationButton.onClick = [this]
+        {
+            showingSettings = !showingSettings;
+            updateScreenVisibility();
+            resized();
+            repaint();
+        };
+
+        addAndMakeVisible(navigationButton);
+
         deviceSelector = std::make_unique<juce::AudioDeviceSelectorComponent>(
             deviceManager,
             1, 2,
@@ -52,6 +64,7 @@ public:
         addAndMakeVisible(gainSlider);
         addAndMakeVisible(gainLabel);
 
+        updateScreenVisibility();
         resized();
     }
 
@@ -143,26 +156,95 @@ public:
     void resized() override
     {
         auto bounds = getLocalBounds().reduced(24);
-        bounds.removeFromTop(56);
 
-        auto controlsArea = bounds.removeFromTop(40);
+        auto headerArea = bounds.removeFromTop(56);
+        navigationButton.setBounds(headerArea.removeFromLeft(40).reduced(6));
 
-        voiceButton.setBounds(controlsArea.removeFromLeft(120));
+        if (showingSettings)
+        {
+            if (deviceSelector != nullptr)
+                deviceSelector->setBounds(bounds);
 
-        controlsArea.removeFromLeft(24);
-        controlsArea.removeFromLeft(120);
-        gainSlider.setBounds(controlsArea);
+            return;
+        }
 
-        bounds.removeFromTop(24);
+        auto controlsArea = bounds.withSizeKeepingCentre(
+            juce::jmin(700, bounds.getWidth()),
+            128
+        );
+
+        auto voiceArea = controlsArea.removeFromTop(44);
+        voiceButton.setBounds(voiceArea.withSizeKeepingCentre(160, 40));
+
+        controlsArea.removeFromTop(32);
+
+        auto gainArea = controlsArea.removeFromTop(40);
+        gainArea.removeFromLeft(120);
+        gainSlider.setBounds(gainArea);
+    }
+
+    void configureNavigationIcons()
+    {
+        juce::Path settingsPath;
+        settingsPath.addRoundedRectangle(6.0f, 8.0f, 28.0f, 4.0f, 2.0f);
+        settingsPath.addRoundedRectangle(6.0f, 18.0f, 28.0f, 4.0f, 2.0f);
+        settingsPath.addRoundedRectangle(6.0f, 28.0f, 28.0f, 4.0f, 2.0f);
+        settingsPath.addEllipse(12.0f, 5.0f, 10.0f, 10.0f);
+        settingsPath.addEllipse(22.0f, 15.0f, 10.0f, 10.0f);
+        settingsPath.addEllipse(10.0f, 25.0f, 10.0f, 10.0f);
+
+        settingsIcon.setPath(settingsPath);
+        settingsIcon.setFill(juce::Colours::white);
+
+        juce::Path backPath;
+        backPath.startNewSubPath(28.0f, 8.0f);
+        backPath.lineTo(12.0f, 20.0f);
+        backPath.lineTo(28.0f, 32.0f);
+        backPath.lineTo(28.0f, 24.0f);
+        backPath.lineTo(36.0f, 24.0f);
+        backPath.lineTo(36.0f, 16.0f);
+        backPath.lineTo(28.0f, 16.0f);
+        backPath.closeSubPath();
+
+        backIcon.setPath(backPath);
+        backIcon.setFill(juce::Colours::white);
+
+        navigationButton.setColour(
+            juce::DrawableButton::backgroundColourId,
+            juce::Colours::transparentBlack
+        );
+
+        navigationButton.setColour(
+            juce::DrawableButton::backgroundOnColourId,
+            juce::Colours::transparentBlack
+        );
+    }
+
+    void updateScreenVisibility()
+    {
+        navigationButton.setImages(showingSettings ? &backIcon : &settingsIcon);
+
+        voiceButton.setVisible(!showingSettings);
+        gainSlider.setVisible(!showingSettings);
+        gainLabel.setVisible(!showingSettings);
 
         if (deviceSelector != nullptr)
-            deviceSelector->setBounds(bounds);
+            deviceSelector->setVisible(showingSettings);
     }
 
 private:
-    private:
+    bool showingSettings = false;
+
     std::atomic<float> outputGain { 2.0f };
     std::atomic<bool> voiceEnabled { false };
+
+    juce::DrawableButton navigationButton {
+        "navigation",
+        juce::DrawableButton::ImageFitted
+    };
+
+    juce::DrawablePath settingsIcon;
+    juce::DrawablePath backIcon;
 
     juce::TextButton voiceButton;
     juce::Slider gainSlider;
