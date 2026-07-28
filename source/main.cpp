@@ -56,6 +56,17 @@ public:
             voiceButton.setButtonText(isEnabled ? "voice on" : "voice off");
         };
 
+        bypassButton.setButtonText("bypass off");
+        bypassButton.setClickingTogglesState(true);
+        bypassButton.setToggleState(false, juce::dontSendNotification);
+        bypassButton.onClick = [this]
+        {
+            auto isEnabled = bypassButton.getToggleState();
+
+            audioEngine.setEffectsBypassed(isEnabled);
+            bypassButton.setButtonText(isEnabled ? "bypass on" : "bypass off");
+        };
+
         echoButton.setButtonText("echo off");
         echoButton.setClickingTogglesState(true);
         echoButton.setToggleState(false, juce::dontSendNotification);
@@ -102,6 +113,7 @@ public:
         mixLabel.attachToComponent(&mixSlider, true);
 
         addAndMakeVisible(voiceButton);
+        addAndMakeVisible(bypassButton);
         addAndMakeVisible(gainSlider);
         addAndMakeVisible(gainLabel);
 
@@ -169,11 +181,16 @@ public:
 
         auto controlsArea = bounds.withSizeKeepingCentre(
             juce::jmin(700, bounds.getWidth()),
-            320
+            380
         );
 
         auto voiceArea = controlsArea.removeFromTop(44);
         voiceButton.setBounds(voiceArea.withSizeKeepingCentre(160, 40));
+
+        controlsArea.removeFromTop(20);
+
+        auto bypassArea = controlsArea.removeFromTop(44);
+        bypassButton.setBounds(bypassArea.withSizeKeepingCentre(160, 40));
 
         controlsArea.removeFromTop(32);
 
@@ -247,6 +264,7 @@ public:
         navigationButton.setImages(showingSettings ? &backIcon : &settingsIcon);
 
         voiceButton.setVisible(!showingSettings);
+        bypassButton.setVisible(!showingSettings);
         gainSlider.setVisible(!showingSettings);
         gainLabel.setVisible(!showingSettings);
 
@@ -280,6 +298,7 @@ private:
     juce::Label gainLabel;
 
     juce::TextButton echoButton;
+    juce::TextButton bypassButton;
     juce::Slider delaySlider;
     juce::Label delayLabel;
     juce::Slider feedbackSlider;

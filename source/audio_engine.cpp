@@ -21,6 +21,11 @@ void AudioEngine::setOutputGain(float newGain)
     outputGain.store(newGain, std::memory_order_relaxed);
 }
 
+void AudioEngine::setEffectsBypassed(bool shouldBeBypassed)
+{
+    effectsBypassed.store(shouldBeBypassed, std::memory_order_relaxed);
+}
+
 void AudioEngine::setEchoEnabled(bool shouldBeEnabled)
 {
     echoEnabled.store(shouldBeEnabled, std::memory_order_relaxed);
@@ -58,6 +63,11 @@ bool AudioEngine::isVoiceEnabled() const
 float AudioEngine::getOutputGain() const
 {
     return outputGain.load(std::memory_order_relaxed);
+}
+
+bool AudioEngine::areEffectsBypassed() const
+{
+    return effectsBypassed.load(std::memory_order_relaxed);
 }
 
 bool AudioEngine::isEchoEnabled() const
@@ -104,7 +114,8 @@ void AudioEngine::processBlock(
     auto maxOutputChannels = activeOutputChannels.getHighestBit() + 1;
 
     auto currentGain = getOutputGain();
-    auto echoIsEnabled = isEchoEnabled();
+    auto effectsAreBypassed = areEffectsBypassed();
+    auto echoIsEnabled = isEchoEnabled() && !effectsAreBypassed;
     auto delaySamples = static_cast<int>(
         currentSampleRate * getEchoDelayMs() / 1000.0
     );

@@ -10,6 +10,7 @@ public:
 
     void setVoiceEnabled(bool shouldBeEnabled);
     void setOutputGain(float newGain);
+    void setEffectsBypassed(bool shouldBeBypassed);
 
     void setEchoEnabled(bool shouldBeEnabled);
     void setEchoDelayMs(float newDelayMs);
@@ -18,6 +19,7 @@ public:
 
     bool isVoiceEnabled() const;
     float getOutputGain() const;
+    bool areEffectsBypassed() const;
 
     bool isEchoEnabled() const;
     float getEchoDelayMs() const;
@@ -34,6 +36,7 @@ private:
 
     std::atomic<float> outputGain { 2.0f };
     std::atomic<bool> voiceEnabled { false };
+    std::atomic<bool> effectsBypassed { false };
 
     std::atomic<bool> echoEnabled { false };
     std::atomic<float> echoDelayMs { 350.0f };
