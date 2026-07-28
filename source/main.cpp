@@ -24,6 +24,9 @@ public:
         };
 
         addAndMakeVisible(navigationButton);
+        addAndMakeVisible(contentViewport);
+        contentViewport.setViewedComponent(&contentComponent, false);
+        contentViewport.setScrollBarsShown(true, false);
 
         deviceSelector = std::make_unique<juce::AudioDeviceSelectorComponent>(
             deviceManager,
@@ -35,7 +38,7 @@ public:
             false
         );
 
-        addAndMakeVisible(*deviceSelector);
+        contentComponent.addAndMakeVisible(*deviceSelector);
 
         inputGainSlider.setRange(0.0, 8.0, 0.01);
         inputGainSlider.setValue(1.0);
@@ -130,24 +133,24 @@ public:
         mixLabel.setText("mix", juce::dontSendNotification);
         mixLabel.attachToComponent(&mixSlider, true);
 
-        addAndMakeVisible(voiceButton);
-        addAndMakeVisible(bypassButton);
-        addAndMakeVisible(inputGainSlider);
-        addAndMakeVisible(inputGainLabel);
-        addAndMakeVisible(gainSlider);
-        addAndMakeVisible(gainLabel);
-        addAndMakeVisible(inputLevelLabel);
-        addAndMakeVisible(inputLevelMeter);
-        addAndMakeVisible(outputLevelLabel);
-        addAndMakeVisible(outputLevelMeter);
+        contentComponent.addAndMakeVisible(voiceButton);
+        contentComponent.addAndMakeVisible(bypassButton);
+        contentComponent.addAndMakeVisible(inputGainSlider);
+        contentComponent.addAndMakeVisible(inputGainLabel);
+        contentComponent.addAndMakeVisible(gainSlider);
+        contentComponent.addAndMakeVisible(gainLabel);
+        contentComponent.addAndMakeVisible(inputLevelLabel);
+        contentComponent.addAndMakeVisible(inputLevelMeter);
+        contentComponent.addAndMakeVisible(outputLevelLabel);
+        contentComponent.addAndMakeVisible(outputLevelMeter);
 
-        addAndMakeVisible(echoButton);
-        addAndMakeVisible(delaySlider);
-        addAndMakeVisible(delayLabel);
-        addAndMakeVisible(feedbackSlider);
-        addAndMakeVisible(feedbackLabel);
-        addAndMakeVisible(mixSlider);
-        addAndMakeVisible(mixLabel);
+        contentComponent.addAndMakeVisible(echoButton);
+        contentComponent.addAndMakeVisible(delaySlider);
+        contentComponent.addAndMakeVisible(delayLabel);
+        contentComponent.addAndMakeVisible(feedbackSlider);
+        contentComponent.addAndMakeVisible(feedbackLabel);
+        contentComponent.addAndMakeVisible(mixSlider);
+        contentComponent.addAndMakeVisible(mixLabel);
 
         updateScreenVisibility();
         resized();
@@ -202,17 +205,24 @@ public:
 
         auto headerArea = bounds.removeFromTop(56);
         navigationButton.setBounds(headerArea.removeFromLeft(40).reduced(6));
+        contentViewport.setBounds(bounds);
+
+        auto contentHeight = showingSettings ? 760 : 520;
+        contentComponent.setSize(
+            juce::jmax(1, contentViewport.getMaximumVisibleWidth()),
+            juce::jmax(contentHeight, contentViewport.getMaximumVisibleHeight())
+        );
 
         if (showingSettings)
         {
             if (deviceSelector != nullptr)
-                deviceSelector->setBounds(bounds);
+                deviceSelector->setBounds(contentComponent.getLocalBounds());
 
             return;
         }
 
-        auto controlsArea = bounds.withSizeKeepingCentre(
-            juce::jmin(700, bounds.getWidth()),
+        auto controlsArea = contentComponent.getLocalBounds().withSizeKeepingCentre(
+            juce::jmin(700, contentComponent.getWidth()),
             500
         );
 
@@ -348,6 +358,9 @@ private:
 
     juce::DrawablePath settingsIcon;
     juce::DrawablePath backIcon;
+
+    juce::Viewport contentViewport;
+    juce::Component contentComponent;
 
     juce::TextButton voiceButton;
     juce::Slider inputGainSlider;
