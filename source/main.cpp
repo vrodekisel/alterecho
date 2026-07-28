@@ -6,7 +6,9 @@ class MainComponent final : public juce::AudioAppComponent
 public:
     MainComponent()
     {
-        setSize(720, 420);
+        setSize(900, 680);
+
+        setAudioChannels(1, 2);
 
         deviceSelector = std::make_unique<juce::AudioDeviceSelectorComponent>(
             deviceManager,
@@ -19,8 +21,7 @@ public:
         );
 
         addAndMakeVisible(*deviceSelector);
-
-        setAudioChannels(1, 2);
+        resized();
     }
 
     ~MainComponent() override
