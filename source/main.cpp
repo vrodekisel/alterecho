@@ -1,5 +1,6 @@
 #include <juce_audio_utils/juce_audio_utils.h>
 #include <juce_gui_extra/juce_gui_extra.h>
+#include <atomic>
 
 class MainComponent final : public juce::AudioAppComponent
 {
@@ -21,6 +22,24 @@ public:
         );
 
         addAndMakeVisible(*deviceSelector);
+
+        gainSlider.setRange(0.0, 4.0, 0.01);
+        gainSlider.setValue(2.0);
+        gainSlider.setTextValueSuffix("x");
+        gainSlider.onValueChange = [this]
+        {
+            outputGain.store(
+                static_cast<float>(gainSlider.getValue()),
+                std::memory_order_relaxed
+            );
+        };
+
+        gainLabel.setText("volume", juce::dontSendNotification);
+        gainLabel.attachToComponent(&gainSlider, true);
+
+        addAndMakeVisible(gainSlider);
+        addAndMakeVisible(gainLabel);
+
         resized();
     }
 
@@ -66,11 +85,18 @@ public:
                     bufferToFill.startSample
                 );
 
-                std::copy(
-                    inputData,
-                    inputData + bufferToFill.numSamples,
-                    outputData
-                );
+                auto currentGain = outputGain.load(std::memory_order_relaxed);
+
+                for (int sample = 0; sample < bufferToFill.numSamples; ++sample)
+                {
+                    auto boostedSample = inputData[sample] * currentGain;
+
+                    outputData[sample] = juce::jlimit(
+                        -1.0f,
+                        1.0f,
+                        boostedSample
+                    );
+                }
             }
             else
             {
@@ -101,11 +127,22 @@ public:
         auto bounds = getLocalBounds().reduced(24);
         bounds.removeFromTop(56);
 
+        auto gainArea = bounds.removeFromTop(40);
+        gainArea.removeFromLeft(120);
+        gainSlider.setBounds(gainArea);
+
+        bounds.removeFromTop(24);
+
         if (deviceSelector != nullptr)
             deviceSelector->setBounds(bounds);
     }
 
 private:
+    std::atomic<float> outputGain { 2.0f };
+
+    juce::Slider gainSlider;
+    juce::Label gainLabel;
+
     std::unique_ptr<juce::AudioDeviceSelectorComponent> deviceSelector;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MainComponent)
