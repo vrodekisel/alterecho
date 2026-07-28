@@ -1,7 +1,101 @@
 #include <juce_audio_utils/juce_audio_utils.h>
 #include <juce_gui_extra/juce_gui_extra.h>
 
+#include <array>
+
 #include "audio_engine.h"
+#include "voice_profile.h"
+
+class ProfileCardButton final : public juce::Button
+{
+public:
+    explicit ProfileCardButton(const VoiceProfile& profileToUse)
+        : juce::Button(profileToUse.name), profile(profileToUse)
+    {
+    }
+
+    VoiceProfileId getProfileId() const
+    {
+        return profile.id;
+    }
+
+    void paintButton(
+        juce::Graphics& g,
+        bool shouldDrawButtonAsHighlighted,
+        bool shouldDrawButtonAsDown
+    ) override
+    {
+        auto bounds = getLocalBounds().toFloat();
+        auto selected = getToggleState();
+        auto baseColour = selected
+            ? juce::Colour::fromRGB(42, 62, 66)
+            : juce::Colour::fromRGB(31, 44, 49);
+
+        if (shouldDrawButtonAsHighlighted)
+            baseColour = baseColour.brighter(0.08f);
+
+        if (shouldDrawButtonAsDown)
+            baseColour = baseColour.darker(0.08f);
+
+        g.setColour(baseColour);
+        g.fillRoundedRectangle(bounds, 7.0f);
+
+        g.setColour(selected ? juce::Colour::fromRGB(119, 185, 198)
+                             : juce::Colour::fromRGB(118, 135, 141));
+        g.drawRoundedRectangle(bounds.reduced(0.5f), 7.0f, selected ? 2.0f : 1.0f);
+
+        auto imageArea = getLocalBounds().reduced(12).removeFromTop(
+            juce::jmax(48, getHeight() - 50)
+        );
+
+        g.setColour(juce::Colour::fromRGB(23, 32, 36));
+        g.fillRoundedRectangle(imageArea.toFloat(), 6.0f);
+
+        g.setColour(juce::Colour::fromRGB(70, 86, 92));
+        g.drawRoundedRectangle(imageArea.toFloat(), 6.0f, 1.0f);
+
+        g.setColour(juce::Colours::white.withAlpha(0.92f));
+        g.setFont(18.0f);
+        g.drawText(
+            profile.name,
+            getLocalBounds().removeFromBottom(38).reduced(8, 0),
+            juce::Justification::centred
+        );
+    }
+
+private:
+    const VoiceProfile& profile;
+};
+
+class ProfileDrawerBackground final : public juce::Component
+{
+public:
+    void paint(juce::Graphics& g) override
+    {
+        auto bounds = getLocalBounds();
+
+        g.setColour(juce::Colour::fromRGB(21, 25, 29));
+        g.fillRect(bounds);
+
+        g.setColour(juce::Colour::fromRGB(56, 67, 72));
+        g.drawVerticalLine(0, 0.0f, static_cast<float>(bounds.getHeight()));
+
+        g.setColour(juce::Colour::fromRGB(30, 40, 45));
+        g.fillRoundedRectangle(imageArea.toFloat(), 8.0f);
+
+        g.setColour(juce::Colour::fromRGB(75, 91, 98));
+        g.drawRoundedRectangle(imageArea.toFloat(), 8.0f, 1.0f);
+    }
+
+    void setImageArea(juce::Rectangle<int> newImageArea)
+    {
+        imageArea = newImageArea;
+        repaint();
+    }
+
+private:
+    juce::Rectangle<int> imageArea;
+};
 
 class MainComponent final : public juce::AudioAppComponent,
                             private juce::Timer
@@ -12,6 +106,9 @@ public:
         setSize(900, 680);
 
         setAudioChannels(1, 2);
+        configureSettings();
+        initialiseProfileControlValues();
+        loadSettings();
 
         configureNavigationIcons();
 
@@ -40,21 +137,25 @@ public:
 
         contentComponent.addAndMakeVisible(*deviceSelector);
 
-        inputGainSlider.setRange(0.0, 8.0, 0.01);
-        inputGainSlider.setValue(1.0);
+        inputGainSlider.setRange(0.0, 4.0, 0.01);
+        inputGainSlider.setValue(inputGain, juce::dontSendNotification);
         inputGainSlider.setTextValueSuffix("x");
         inputGainSlider.onValueChange = [this]
         {
-            audioEngine.setInputGain(static_cast<float>(inputGainSlider.getValue()));
+            inputGain = static_cast<float>(inputGainSlider.getValue());
+            audioEngine.setInputGain(inputGain);
+            saveGlobalSettings();
         };
 
         gainSlider.setRange(0.0, 4.0, 0.01);
-        gainSlider.setValue(1.0);
+        gainSlider.setValue(outputGain, juce::dontSendNotification);
         gainSlider.setTextValueSuffix("x");
 
         gainSlider.onValueChange = [this]
         {
-            audioEngine.setOutputGain(static_cast<float>(gainSlider.getValue()));
+            outputGain = static_cast<float>(gainSlider.getValue());
+            audioEngine.setOutputGain(outputGain);
+            saveGlobalSettings();
         };
 
         voiceButton.setButtonText("voice off");
@@ -79,38 +180,55 @@ public:
             bypassButton.setButtonText(isEnabled ? "effects off" : "effects on");
         };
 
-        echoButton.setButtonText("echo off");
-        echoButton.setClickingTogglesState(true);
-        echoButton.setToggleState(false, juce::dontSendNotification);
-        echoButton.onClick = [this]
-        {
-            auto isEnabled = echoButton.getToggleState();
+        profileLabel.setText("profiles", juce::dontSendNotification);
+        profileLabel.setJustificationType(juce::Justification::centredLeft);
 
-            audioEngine.setEchoEnabled(isEnabled);
-            echoButton.setButtonText(isEnabled ? "echo on" : "echo off");
+        profileDrawerTitle.setJustificationType(juce::Justification::centredLeft);
+        profileDrawerTitle.setFont(juce::Font(24.0f, juce::Font::bold));
+        profileDrawerDescription.setJustificationType(juce::Justification::topLeft);
+        profileDrawerDescription.setColour(
+            juce::Label::textColourId,
+            juce::Colours::white.withAlpha(0.78f)
+        );
+
+        closeProfileDrawerButton.setButtonText("x");
+        closeProfileDrawerButton.onClick = [this]
+        {
+            profileDrawerOpen = false;
+            updateProfilePanel();
+            resized();
+            repaint();
         };
 
-        delaySlider.setRange(1.0, 2000.0, 1.0);
-        delaySlider.setValue(350.0);
-        delaySlider.setTextValueSuffix(" ms");
-        delaySlider.onValueChange = [this]
+        configureProfileButtons();
+
+        resetProfileButton.setButtonText("reset profile");
+        resetProfileButton.onClick = [this]
         {
-            audioEngine.setEchoDelayMs(static_cast<float>(delaySlider.getValue()));
+            resetCurrentProfileToDefaults();
         };
 
-        feedbackSlider.setRange(0.0, 0.95, 0.01);
-        feedbackSlider.setValue(0.35);
-        feedbackSlider.onValueChange = [this]
+        for (auto index = 0; index < static_cast<int>(controlSliders.size()); ++index)
         {
-            audioEngine.setEchoFeedback(static_cast<float>(feedbackSlider.getValue()));
-        };
+            auto& slider = controlSliders[static_cast<size_t>(index)];
+            auto& label = controlLabels[static_cast<size_t>(index)];
 
-        mixSlider.setRange(0.0, 1.0, 0.01);
-        mixSlider.setValue(0.35);
-        mixSlider.onValueChange = [this]
-        {
-            audioEngine.setEchoMix(static_cast<float>(mixSlider.getValue()));
-        };
+            slider.setRange(0.0, 1.0, 0.01);
+            slider.setSliderStyle(juce::Slider::LinearHorizontal);
+            slider.setTextBoxStyle(juce::Slider::TextBoxLeft, false, 58, 24);
+            slider.setTextValueSuffix("");
+            slider.onValueChange = [this, index]
+            {
+                updateCurrentControlValue(index, static_cast<float>(
+                    controlSliders[static_cast<size_t>(index)].getValue()
+                ));
+            };
+
+            label.setJustificationType(juce::Justification::centredLeft);
+
+            addAndMakeVisible(slider);
+            addAndMakeVisible(label);
+        }
 
         gainLabel.setText("output", juce::dontSendNotification);
         gainLabel.attachToComponent(&gainSlider, true);
@@ -124,17 +242,9 @@ public:
         inputLevelMeter.setPercentageDisplay(false);
         outputLevelMeter.setPercentageDisplay(false);
 
-        delayLabel.setText("delay", juce::dontSendNotification);
-        delayLabel.attachToComponent(&delaySlider, true);
-
-        feedbackLabel.setText("feedback", juce::dontSendNotification);
-        feedbackLabel.attachToComponent(&feedbackSlider, true);
-
-        mixLabel.setText("mix", juce::dontSendNotification);
-        mixLabel.attachToComponent(&mixSlider, true);
-
         contentComponent.addAndMakeVisible(voiceButton);
         contentComponent.addAndMakeVisible(bypassButton);
+        contentComponent.addAndMakeVisible(profileLabel);
         contentComponent.addAndMakeVisible(inputGainSlider);
         contentComponent.addAndMakeVisible(inputGainLabel);
         contentComponent.addAndMakeVisible(gainSlider);
@@ -144,14 +254,15 @@ public:
         contentComponent.addAndMakeVisible(outputLevelLabel);
         contentComponent.addAndMakeVisible(outputLevelMeter);
 
-        contentComponent.addAndMakeVisible(echoButton);
-        contentComponent.addAndMakeVisible(delaySlider);
-        contentComponent.addAndMakeVisible(delayLabel);
-        contentComponent.addAndMakeVisible(feedbackSlider);
-        contentComponent.addAndMakeVisible(feedbackLabel);
-        contentComponent.addAndMakeVisible(mixSlider);
-        contentComponent.addAndMakeVisible(mixLabel);
+        addAndMakeVisible(profileDrawerBackground);
+        addAndMakeVisible(profileDrawerTitle);
+        addAndMakeVisible(profileDrawerDescription);
+        addAndMakeVisible(closeProfileDrawerButton);
+        addAndMakeVisible(resetProfileButton);
 
+        audioEngine.setInputGain(inputGain);
+        audioEngine.setOutputGain(outputGain);
+        applySelectedVoiceProfile();
         updateScreenVisibility();
         resized();
         startTimerHz(30);
@@ -197,6 +308,7 @@ public:
         g.setFont(24.0f);
         g.drawText("alterecho", getLocalBounds().removeFromTop(56),
                    juce::Justification::centred);
+
     }
 
     void resized() override
@@ -205,12 +317,16 @@ public:
 
         auto headerArea = bounds.removeFromTop(56);
         navigationButton.setBounds(headerArea.removeFromLeft(40).reduced(6));
-        contentViewport.setBounds(bounds);
 
-        auto contentHeight = showingSettings ? 760 : 520;
+        contentViewport.setBounds(bounds);
+        contentViewport.setScrollBarsShown(!showingSettings, false);
+
+        auto contentHeight = showingSettings
+            ? juce::jmax(1, contentViewport.getMaximumVisibleHeight())
+            : juce::jmax(1180, contentViewport.getMaximumVisibleHeight());
         contentComponent.setSize(
             juce::jmax(1, contentViewport.getMaximumVisibleWidth()),
-            juce::jmax(contentHeight, contentViewport.getMaximumVisibleHeight())
+            contentHeight
         );
 
         if (showingSettings)
@@ -222,8 +338,8 @@ public:
         }
 
         auto controlsArea = contentComponent.getLocalBounds().withSizeKeepingCentre(
-            juce::jmin(700, contentComponent.getWidth()),
-            500
+            juce::jmin(760, contentComponent.getWidth()),
+            1120
         );
 
         auto voiceArea = controlsArea.removeFromTop(44);
@@ -233,6 +349,16 @@ public:
 
         auto bypassArea = controlsArea.removeFromTop(44);
         bypassButton.setBounds(bypassArea.withSizeKeepingCentre(160, 40));
+
+        controlsArea.removeFromTop(18);
+
+        auto profileHeaderArea = controlsArea.removeFromTop(30);
+        profileLabel.setBounds(profileHeaderArea.removeFromLeft(120));
+
+        controlsArea.removeFromTop(8);
+
+        auto profileGridArea = controlsArea.removeFromTop(696);
+        layoutProfileButtons(profileGridArea);
 
         controlsArea.removeFromTop(18);
 
@@ -258,28 +384,353 @@ public:
         outputLevelLabel.setBounds(outputMeterArea.removeFromLeft(120));
         outputLevelMeter.setBounds(outputMeterArea);
 
-        controlsArea.removeFromTop(18);
+        layoutProfileDrawer();
+    }
 
-        auto echoArea = controlsArea.removeFromTop(44);
-        echoButton.setBounds(echoArea.withSizeKeepingCentre(160, 40));
+    void configureSettings()
+    {
+        juce::PropertiesFile::Options options;
+        options.applicationName = "alterecho";
+        options.filenameSuffix = "settings";
+        options.osxLibrarySubFolder = "Application Support";
 
-        controlsArea.removeFromTop(18);
+        applicationProperties.setStorageParameters(options);
+    }
 
-        auto delayArea = controlsArea.removeFromTop(36);
-        delayArea.removeFromLeft(120);
-        delaySlider.setBounds(delayArea);
+    void initialiseProfileControlValues()
+    {
+        profileControlValues.clear();
 
-        controlsArea.removeFromTop(10);
+        for (const auto& profile : getVoiceProfiles())
+        {
+            std::vector<float> values;
 
-        auto feedbackArea = controlsArea.removeFromTop(36);
-        feedbackArea.removeFromLeft(120);
-        feedbackSlider.setBounds(feedbackArea);
+            for (const auto& control : profile.controls)
+                values.push_back(control.defaultValue);
 
-        controlsArea.removeFromTop(10);
+            profileControlValues.push_back(values);
+        }
+    }
 
-        auto mixArea = controlsArea.removeFromTop(36);
-        mixArea.removeFromLeft(120);
-        mixSlider.setBounds(mixArea);
+    void loadSettings()
+    {
+        auto* settings = applicationProperties.getUserSettings();
+
+        if (settings == nullptr)
+            return;
+
+        selectedProfileId = getVoiceProfileIdFromKey(
+            settings->getValue("selectedProfile", getVoiceProfileKey(VoiceProfileId::echo))
+        );
+        inputGain = static_cast<float>(settings->getDoubleValue("inputGain", 1.0));
+        outputGain = static_cast<float>(settings->getDoubleValue("outputGain", 1.0));
+
+        for (const auto& profile : getVoiceProfiles())
+        {
+            auto profileIndex = getProfileIndex(profile.id);
+
+            if (profileIndex < 0)
+                continue;
+
+            auto& values = profileControlValues[static_cast<size_t>(profileIndex)];
+
+            for (auto controlIndex = 0; controlIndex < static_cast<int>(profile.controls.size()); ++controlIndex)
+            {
+                auto key = getSettingKey(profile, profile.controls[static_cast<size_t>(controlIndex)]);
+                values[static_cast<size_t>(controlIndex)] = juce::jlimit(
+                    0.0f,
+                    1.0f,
+                    static_cast<float>(settings->getDoubleValue(
+                        key,
+                        profile.controls[static_cast<size_t>(controlIndex)].defaultValue
+                    ))
+                );
+            }
+        }
+    }
+
+    void saveGlobalSettings()
+    {
+        auto* settings = applicationProperties.getUserSettings();
+
+        if (settings == nullptr)
+            return;
+
+        settings->setValue("selectedProfile", getVoiceProfileKey(selectedProfileId));
+        settings->setValue("inputGain", static_cast<double>(inputGain));
+        settings->setValue("outputGain", static_cast<double>(outputGain));
+        settings->saveIfNeeded();
+    }
+
+    void saveCurrentProfileSettings()
+    {
+        auto* settings = applicationProperties.getUserSettings();
+
+        if (settings == nullptr)
+            return;
+
+        auto profileIndex = getProfileIndex(selectedProfileId);
+
+        if (profileIndex < 0)
+            return;
+
+        const auto& profile = getVoiceProfile(selectedProfileId);
+        const auto& values = profileControlValues[static_cast<size_t>(profileIndex)];
+
+        for (auto controlIndex = 0; controlIndex < static_cast<int>(profile.controls.size()); ++controlIndex)
+        {
+            settings->setValue(
+                getSettingKey(profile, profile.controls[static_cast<size_t>(controlIndex)]),
+                static_cast<double>(values[static_cast<size_t>(controlIndex)])
+            );
+        }
+
+        settings->saveIfNeeded();
+    }
+
+    juce::String getSettingKey(const VoiceProfile& profile, const VoiceControl& control) const
+    {
+        return "profile." + getVoiceProfileKey(profile.id) + "." + getVoiceControlKey(control.id);
+    }
+
+    int getProfileIndex(VoiceProfileId id) const
+    {
+        const auto& profiles = getVoiceProfiles();
+
+        for (auto index = 0; index < static_cast<int>(profiles.size()); ++index)
+        {
+            if (profiles[static_cast<size_t>(index)].id == id)
+                return index;
+        }
+
+        return -1;
+    }
+
+    void configureProfileButtons()
+    {
+        constexpr auto profileRadioGroupId = 1001;
+
+        for (const auto& profile : getVoiceProfiles())
+        {
+            auto button = std::make_unique<ProfileCardButton>(profile);
+            button->setRadioGroupId(profileRadioGroupId);
+            button->setClickingTogglesState(true);
+            button->setToggleState(profile.id == selectedProfileId, juce::dontSendNotification);
+            button->onClick = [this, profileId = profile.id]
+            {
+                selectProfile(profileId);
+            };
+
+            contentComponent.addAndMakeVisible(*button);
+            profileButtons.push_back(std::move(button));
+        }
+    }
+
+    void selectProfile(VoiceProfileId profileId)
+    {
+        selectedProfileId = profileId;
+        profileDrawerOpen = true;
+
+        for (auto index = 0; index < static_cast<int>(getVoiceProfiles().size()); ++index)
+        {
+            auto shouldBeSelected = getVoiceProfiles()[static_cast<size_t>(index)].id == selectedProfileId;
+            profileButtons[static_cast<size_t>(index)]->setToggleState(
+                shouldBeSelected,
+                juce::dontSendNotification
+            );
+        }
+
+        applySelectedVoiceProfile();
+        saveGlobalSettings();
+        resized();
+        repaint();
+    }
+
+    void updateCurrentControlValue(int controlIndex, float value)
+    {
+        auto profileIndex = getProfileIndex(selectedProfileId);
+
+        if (profileIndex < 0)
+            return;
+
+        auto& values = profileControlValues[static_cast<size_t>(profileIndex)];
+
+        if (controlIndex < 0 || controlIndex >= static_cast<int>(values.size()))
+            return;
+
+        values[static_cast<size_t>(controlIndex)] = juce::jlimit(0.0f, 1.0f, value);
+        applySelectedVoiceProfile();
+        saveCurrentProfileSettings();
+    }
+
+    void resetCurrentProfileToDefaults()
+    {
+        auto profileIndex = getProfileIndex(selectedProfileId);
+
+        if (profileIndex < 0)
+            return;
+
+        const auto& profile = getVoiceProfile(selectedProfileId);
+        auto& values = profileControlValues[static_cast<size_t>(profileIndex)];
+        values.clear();
+
+        for (const auto& control : profile.controls)
+            values.push_back(control.defaultValue);
+
+        applySelectedVoiceProfile();
+        saveCurrentProfileSettings();
+    }
+
+    void applySelectedVoiceProfile()
+    {
+        auto profileIndex = getProfileIndex(selectedProfileId);
+
+        if (profileIndex < 0)
+            profileIndex = 0;
+
+        const auto& profile = getVoiceProfile(selectedProfileId);
+        const auto& values = profileControlValues[static_cast<size_t>(profileIndex)];
+
+        audioEngine.setVoiceProfileParameters(
+            mapVoiceProfileToTechnicalParameters(profile, values)
+        );
+
+        updateProfilePanel();
+    }
+
+    void updateProfilePanel()
+    {
+        const auto& profile = getVoiceProfile(selectedProfileId);
+        auto profileIndex = getProfileIndex(selectedProfileId);
+
+        profileDrawerTitle.setText(profile.name, juce::dontSendNotification);
+        profileDrawerDescription.setText(profile.description, juce::dontSendNotification);
+
+        if (profileIndex < 0)
+            return;
+
+        const auto& values = profileControlValues[static_cast<size_t>(profileIndex)];
+
+        for (auto index = 0; index < static_cast<int>(controlSliders.size()); ++index)
+        {
+            auto hasControl = index < static_cast<int>(profile.controls.size());
+            auto& slider = controlSliders[static_cast<size_t>(index)];
+            auto& label = controlLabels[static_cast<size_t>(index)];
+
+            slider.setVisible(!showingSettings && profileDrawerOpen && hasControl);
+            label.setVisible(!showingSettings && profileDrawerOpen && hasControl);
+
+            if (!hasControl)
+                continue;
+
+            label.setText(profile.controls[static_cast<size_t>(index)].name, juce::dontSendNotification);
+            slider.setValue(values[static_cast<size_t>(index)], juce::dontSendNotification);
+        }
+
+        auto drawerVisible = !showingSettings && profileDrawerOpen;
+        profileDrawerBackground.setVisible(drawerVisible);
+        profileDrawerTitle.setVisible(drawerVisible);
+        profileDrawerDescription.setVisible(drawerVisible);
+        closeProfileDrawerButton.setVisible(drawerVisible);
+        resetProfileButton.setVisible(drawerVisible && !profile.controls.empty());
+    }
+
+    void layoutProfileDrawer()
+    {
+        if (!profileDrawerOpen || showingSettings)
+        {
+            profileDrawerBackground.setBounds({});
+            profileDrawerTitle.setBounds({});
+            profileDrawerDescription.setBounds({});
+            closeProfileDrawerButton.setBounds({});
+            resetProfileButton.setBounds({});
+            layoutProfileControls({});
+            return;
+        }
+
+        auto drawerWidth = getProfileDrawerWidth();
+        auto drawerBounds = getLocalBounds().removeFromRight(drawerWidth);
+        profileDrawerBackground.setBounds(drawerBounds);
+
+        auto drawerArea = drawerBounds.reduced(22, 74);
+        auto headerArea = drawerArea.removeFromTop(36);
+
+        closeProfileDrawerButton.setBounds(headerArea.removeFromRight(34));
+        profileDrawerTitle.setBounds(headerArea);
+
+        drawerArea.removeFromTop(14);
+
+        auto imageSlot = drawerArea.removeFromTop(230);
+        profileImagePlaceholder = imageSlot.withSizeKeepingCentre(
+            juce::jmin(180, imageSlot.getWidth()),
+            imageSlot.getHeight()
+        );
+        profileDrawerBackground.setImageArea(
+            profileImagePlaceholder.translated(-drawerBounds.getX(), -drawerBounds.getY())
+        );
+        drawerArea.removeFromTop(10);
+
+        profileDrawerDescription.setBounds(drawerArea.removeFromTop(42));
+        drawerArea.removeFromTop(12);
+
+        layoutProfileControls(drawerArea.removeFromTop(166));
+        drawerArea.removeFromTop(12);
+
+        resetProfileButton.setBounds(
+            drawerArea.removeFromTop(42).withSizeKeepingCentre(190, 38)
+        );
+
+        profileDrawerBackground.toBack();
+        profileDrawerBackground.toFront(false);
+        profileDrawerTitle.toFront(false);
+        profileDrawerDescription.toFront(false);
+        closeProfileDrawerButton.toFront(false);
+        resetProfileButton.toFront(false);
+
+        for (auto& slider : controlSliders)
+            slider.toFront(false);
+
+        for (auto& label : controlLabels)
+            label.toFront(false);
+    }
+
+    int getProfileDrawerWidth() const
+    {
+        return juce::jmin(330, juce::jmax(280, getWidth() / 3));
+    }
+
+    void layoutProfileButtons(juce::Rectangle<int> area)
+    {
+        constexpr auto columns = 4;
+        constexpr auto buttonHeight = 220;
+        constexpr auto gap = 12;
+        auto buttonWidth = (area.getWidth() - gap * (columns - 1)) / columns;
+
+        for (auto index = 0; index < static_cast<int>(profileButtons.size()); ++index)
+        {
+            auto row = index / columns;
+            auto column = index % columns;
+            auto buttonArea = juce::Rectangle<int>(
+                area.getX() + column * (buttonWidth + gap),
+                area.getY() + row * (buttonHeight + gap),
+                buttonWidth,
+                buttonHeight
+            );
+
+            profileButtons[static_cast<size_t>(index)]->setBounds(buttonArea);
+        }
+    }
+
+    void layoutProfileControls(juce::Rectangle<int> area)
+    {
+        for (auto index = 0; index < static_cast<int>(controlSliders.size()); ++index)
+        {
+            auto row = area.removeFromTop(32);
+            controlLabels[static_cast<size_t>(index)].setBounds(row.removeFromLeft(82));
+            row.removeFromLeft(8);
+            controlSliders[static_cast<size_t>(index)].setBounds(row);
+            area.removeFromTop(9);
+        }
     }
 
     void configureNavigationIcons()
@@ -325,6 +776,7 @@ public:
 
         voiceButton.setVisible(!showingSettings);
         bypassButton.setVisible(!showingSettings);
+        profileLabel.setVisible(!showingSettings);
         inputGainSlider.setVisible(!showingSettings);
         inputGainLabel.setVisible(!showingSettings);
         gainSlider.setVisible(!showingSettings);
@@ -334,13 +786,10 @@ public:
         outputLevelLabel.setVisible(!showingSettings);
         outputLevelMeter.setVisible(!showingSettings);
 
-        echoButton.setVisible(!showingSettings);
-        delaySlider.setVisible(!showingSettings);
-        delayLabel.setVisible(!showingSettings);
-        feedbackSlider.setVisible(!showingSettings);
-        feedbackLabel.setVisible(!showingSettings);
-        mixSlider.setVisible(!showingSettings);
-        mixLabel.setVisible(!showingSettings);
+        for (const auto& button : profileButtons)
+            button->setVisible(!showingSettings);
+
+        updateProfilePanel();
 
         if (deviceSelector != nullptr)
             deviceSelector->setVisible(showingSettings);
@@ -348,8 +797,14 @@ public:
 
 private:
     bool showingSettings = false;
+    bool profileDrawerOpen = false;
+    float inputGain = 1.0f;
+    float outputGain = 1.0f;
 
     AudioEngine audioEngine;
+    juce::ApplicationProperties applicationProperties;
+    VoiceProfileId selectedProfileId = VoiceProfileId::echo;
+    std::vector<std::vector<float>> profileControlValues;
 
     juce::DrawableButton navigationButton {
         "navigation",
@@ -374,14 +829,17 @@ private:
     juce::ProgressBar inputLevelMeter { inputLevelValue };
     juce::ProgressBar outputLevelMeter { outputLevelValue };
 
-    juce::TextButton echoButton;
     juce::TextButton bypassButton;
-    juce::Slider delaySlider;
-    juce::Label delayLabel;
-    juce::Slider feedbackSlider;
-    juce::Label feedbackLabel;
-    juce::Slider mixSlider;
-    juce::Label mixLabel;
+    juce::Label profileLabel;
+    ProfileDrawerBackground profileDrawerBackground;
+    juce::Label profileDrawerTitle;
+    juce::Label profileDrawerDescription;
+    juce::TextButton closeProfileDrawerButton;
+    juce::TextButton resetProfileButton;
+    juce::Rectangle<int> profileImagePlaceholder;
+    std::vector<std::unique_ptr<ProfileCardButton>> profileButtons;
+    std::array<juce::Slider, 5> controlSliders;
+    std::array<juce::Label, 5> controlLabels;
 
     std::unique_ptr<juce::AudioDeviceSelectorComponent> deviceSelector;
 

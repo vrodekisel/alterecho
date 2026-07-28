@@ -17,6 +17,7 @@ target_sources(alterecho
         source/main.cpp
         source/audio_engine.cpp
         source/echo_effect.cpp
+        source/voice_profile.cpp
 )
 
 target_compile_definitions(alterecho

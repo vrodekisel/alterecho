@@ -27,24 +27,12 @@ void AudioEngine::setEffectsBypassed(bool shouldBeBypassed)
     effectsBypassed.store(shouldBeBypassed, std::memory_order_relaxed);
 }
 
-void AudioEngine::setEchoEnabled(bool shouldBeEnabled)
+void AudioEngine::setVoiceProfileParameters(const TechnicalVoiceParameters& parameters)
 {
-    echoEffect.setEnabled(shouldBeEnabled);
-}
-
-void AudioEngine::setEchoDelayMs(float newDelayMs)
-{
-    echoEffect.setDelayMs(newDelayMs);
-}
-
-void AudioEngine::setEchoFeedback(float newFeedback)
-{
-    echoEffect.setFeedback(newFeedback);
-}
-
-void AudioEngine::setEchoMix(float newMix)
-{
-    echoEffect.setMix(newMix);
+    echoEffect.setEnabled(parameters.echoEnabled);
+    echoEffect.setDelayMs(parameters.echoDelayMs);
+    echoEffect.setFeedback(parameters.echoFeedback);
+    echoEffect.setMix(parameters.echoMix);
 }
 
 bool AudioEngine::isVoiceEnabled() const

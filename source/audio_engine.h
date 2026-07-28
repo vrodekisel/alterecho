@@ -4,6 +4,7 @@
 #include <atomic>
 
 #include "echo_effect.h"
+#include "voice_profile.h"
 
 class AudioEngine
 {
@@ -15,10 +16,7 @@ public:
     void setOutputGain(float newGain);
     void setEffectsBypassed(bool shouldBeBypassed);
 
-    void setEchoEnabled(bool shouldBeEnabled);
-    void setEchoDelayMs(float newDelayMs);
-    void setEchoFeedback(float newFeedback);
-    void setEchoMix(float newMix);
+    void setVoiceProfileParameters(const TechnicalVoiceParameters& parameters);
 
     bool isVoiceEnabled() const;
     float getInputGain() const;
