@@ -3,7 +3,8 @@
 
 #include "audio_engine.h"
 
-class MainComponent final : public juce::AudioAppComponent
+class MainComponent final : public juce::AudioAppComponent,
+                            private juce::Timer
 {
 public:
     MainComponent()
@@ -36,8 +37,16 @@ public:
 
         addAndMakeVisible(*deviceSelector);
 
+        inputGainSlider.setRange(0.0, 8.0, 0.01);
+        inputGainSlider.setValue(1.0);
+        inputGainSlider.setTextValueSuffix("x");
+        inputGainSlider.onValueChange = [this]
+        {
+            audioEngine.setInputGain(static_cast<float>(inputGainSlider.getValue()));
+        };
+
         gainSlider.setRange(0.0, 4.0, 0.01);
-        gainSlider.setValue(2.0);
+        gainSlider.setValue(1.0);
         gainSlider.setTextValueSuffix("x");
 
         gainSlider.onValueChange = [this]
@@ -100,8 +109,17 @@ public:
             audioEngine.setEchoMix(static_cast<float>(mixSlider.getValue()));
         };
 
-        gainLabel.setText("volume", juce::dontSendNotification);
+        gainLabel.setText("output", juce::dontSendNotification);
         gainLabel.attachToComponent(&gainSlider, true);
+
+        inputGainLabel.setText("input", juce::dontSendNotification);
+        inputGainLabel.attachToComponent(&inputGainSlider, true);
+
+        inputLevelLabel.setText("input level", juce::dontSendNotification);
+        outputLevelLabel.setText("output level", juce::dontSendNotification);
+
+        inputLevelMeter.setPercentageDisplay(false);
+        outputLevelMeter.setPercentageDisplay(false);
 
         delayLabel.setText("delay", juce::dontSendNotification);
         delayLabel.attachToComponent(&delaySlider, true);
@@ -114,8 +132,14 @@ public:
 
         addAndMakeVisible(voiceButton);
         addAndMakeVisible(bypassButton);
+        addAndMakeVisible(inputGainSlider);
+        addAndMakeVisible(inputGainLabel);
         addAndMakeVisible(gainSlider);
         addAndMakeVisible(gainLabel);
+        addAndMakeVisible(inputLevelLabel);
+        addAndMakeVisible(inputLevelMeter);
+        addAndMakeVisible(outputLevelLabel);
+        addAndMakeVisible(outputLevelMeter);
 
         addAndMakeVisible(echoButton);
         addAndMakeVisible(delaySlider);
@@ -127,6 +151,7 @@ public:
 
         updateScreenVisibility();
         resized();
+        startTimerHz(30);
     }
 
     ~MainComponent() override
@@ -153,6 +178,13 @@ public:
     }
 
     void releaseResources() override {}
+
+    void timerCallback() override
+    {
+        inputLevelValue = audioEngine.getInputLevel();
+        outputLevelValue = audioEngine.getOutputLevel();
+        repaint();
+    }
 
     void paint(juce::Graphics& g) override
     {
@@ -181,7 +213,7 @@ public:
 
         auto controlsArea = bounds.withSizeKeepingCentre(
             juce::jmin(700, bounds.getWidth()),
-            380
+            500
         );
 
         auto voiceArea = controlsArea.removeFromTop(44);
@@ -192,32 +224,50 @@ public:
         auto bypassArea = controlsArea.removeFromTop(44);
         bypassButton.setBounds(bypassArea.withSizeKeepingCentre(160, 40));
 
-        controlsArea.removeFromTop(32);
+        controlsArea.removeFromTop(18);
 
-        auto gainArea = controlsArea.removeFromTop(40);
+        auto inputGainArea = controlsArea.removeFromTop(36);
+        inputGainArea.removeFromLeft(120);
+        inputGainSlider.setBounds(inputGainArea);
+
+        controlsArea.removeFromTop(12);
+
+        auto gainArea = controlsArea.removeFromTop(36);
         gainArea.removeFromLeft(120);
         gainSlider.setBounds(gainArea);
 
-        controlsArea.removeFromTop(28);
+        controlsArea.removeFromTop(14);
+
+        auto inputMeterArea = controlsArea.removeFromTop(22);
+        inputLevelLabel.setBounds(inputMeterArea.removeFromLeft(120));
+        inputLevelMeter.setBounds(inputMeterArea);
+
+        controlsArea.removeFromTop(8);
+
+        auto outputMeterArea = controlsArea.removeFromTop(22);
+        outputLevelLabel.setBounds(outputMeterArea.removeFromLeft(120));
+        outputLevelMeter.setBounds(outputMeterArea);
+
+        controlsArea.removeFromTop(18);
 
         auto echoArea = controlsArea.removeFromTop(44);
         echoButton.setBounds(echoArea.withSizeKeepingCentre(160, 40));
 
-        controlsArea.removeFromTop(28);
+        controlsArea.removeFromTop(18);
 
-        auto delayArea = controlsArea.removeFromTop(40);
+        auto delayArea = controlsArea.removeFromTop(36);
         delayArea.removeFromLeft(120);
         delaySlider.setBounds(delayArea);
 
-        controlsArea.removeFromTop(20);
+        controlsArea.removeFromTop(10);
 
-        auto feedbackArea = controlsArea.removeFromTop(40);
+        auto feedbackArea = controlsArea.removeFromTop(36);
         feedbackArea.removeFromLeft(120);
         feedbackSlider.setBounds(feedbackArea);
 
-        controlsArea.removeFromTop(20);
+        controlsArea.removeFromTop(10);
 
-        auto mixArea = controlsArea.removeFromTop(40);
+        auto mixArea = controlsArea.removeFromTop(36);
         mixArea.removeFromLeft(120);
         mixSlider.setBounds(mixArea);
     }
@@ -265,8 +315,14 @@ public:
 
         voiceButton.setVisible(!showingSettings);
         bypassButton.setVisible(!showingSettings);
+        inputGainSlider.setVisible(!showingSettings);
+        inputGainLabel.setVisible(!showingSettings);
         gainSlider.setVisible(!showingSettings);
         gainLabel.setVisible(!showingSettings);
+        inputLevelLabel.setVisible(!showingSettings);
+        inputLevelMeter.setVisible(!showingSettings);
+        outputLevelLabel.setVisible(!showingSettings);
+        outputLevelMeter.setVisible(!showingSettings);
 
         echoButton.setVisible(!showingSettings);
         delaySlider.setVisible(!showingSettings);
@@ -294,8 +350,16 @@ private:
     juce::DrawablePath backIcon;
 
     juce::TextButton voiceButton;
+    juce::Slider inputGainSlider;
+    juce::Label inputGainLabel;
     juce::Slider gainSlider;
     juce::Label gainLabel;
+    juce::Label inputLevelLabel;
+    juce::Label outputLevelLabel;
+    double inputLevelValue = 0.0;
+    double outputLevelValue = 0.0;
+    juce::ProgressBar inputLevelMeter { inputLevelValue };
+    juce::ProgressBar outputLevelMeter { outputLevelValue };
 
     juce::TextButton echoButton;
     juce::TextButton bypassButton;

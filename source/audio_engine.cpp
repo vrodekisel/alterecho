@@ -10,6 +10,11 @@ void AudioEngine::setVoiceEnabled(bool shouldBeEnabled)
     voiceEnabled.store(shouldBeEnabled, std::memory_order_relaxed);
 }
 
+void AudioEngine::setInputGain(float newGain)
+{
+    inputGain.store(newGain, std::memory_order_relaxed);
+}
+
 void AudioEngine::setOutputGain(float newGain)
 {
     outputGain.store(newGain, std::memory_order_relaxed);
@@ -45,6 +50,11 @@ bool AudioEngine::isVoiceEnabled() const
     return voiceEnabled.load(std::memory_order_relaxed);
 }
 
+float AudioEngine::getInputGain() const
+{
+    return inputGain.load(std::memory_order_relaxed);
+}
+
 float AudioEngine::getOutputGain() const
 {
     return outputGain.load(std::memory_order_relaxed);
@@ -55,6 +65,16 @@ bool AudioEngine::areEffectsBypassed() const
     return effectsBypassed.load(std::memory_order_relaxed);
 }
 
+float AudioEngine::getInputLevel() const
+{
+    return inputLevel.load(std::memory_order_relaxed);
+}
+
+float AudioEngine::getOutputLevel() const
+{
+    return outputLevel.load(std::memory_order_relaxed);
+}
+
 void AudioEngine::processBlock(
     const juce::AudioSourceChannelInfo& bufferToFill,
     const juce::AudioIODevice& device
@@ -62,6 +82,8 @@ void AudioEngine::processBlock(
 {
     if (!isVoiceEnabled())
     {
+        inputLevel.store(0.0f, std::memory_order_relaxed);
+        outputLevel.store(0.0f, std::memory_order_relaxed);
         bufferToFill.clearActiveBufferRegion();
         return;
     }
@@ -85,12 +107,17 @@ void AudioEngine::processBlock(
 
     if (firstInputChannel < 0)
     {
+        inputLevel.store(0.0f, std::memory_order_relaxed);
+        outputLevel.store(0.0f, std::memory_order_relaxed);
         bufferToFill.clearActiveBufferRegion();
         return;
     }
 
-    auto currentGain = getOutputGain();
+    auto currentInputGain = getInputGain();
+    auto currentOutputGain = getOutputGain();
     auto effectsAreBypassed = areEffectsBypassed();
+    auto blockInputPeak = 0.0f;
+    auto blockOutputPeak = 0.0f;
 
     for (int sample = 0; sample < bufferToFill.numSamples; ++sample)
     {
@@ -114,19 +141,30 @@ void AudioEngine::processBlock(
                 bufferToFill.startSample
             );
 
-            auto outputSample = inputData[sample] * currentGain;
+            auto outputSample = inputData[sample] * currentInputGain;
+            blockInputPeak = juce::jmax(blockInputPeak, std::abs(outputSample));
 
             if (!effectsAreBypassed)
                 outputSample = echoEffect.processSample(outputSample, channel);
+
+            outputSample *= currentOutputGain;
 
             outputData[sample] = juce::jlimit(
                 -1.0f,
                 1.0f,
                 outputSample
             );
+
+            blockOutputPeak = juce::jmax(
+                blockOutputPeak,
+                std::abs(outputData[sample])
+            );
         }
 
         if (!effectsAreBypassed)
             echoEffect.advance();
     }
+
+    inputLevel.store(juce::jlimit(0.0f, 1.0f, blockInputPeak), std::memory_order_relaxed);
+    outputLevel.store(juce::jlimit(0.0f, 1.0f, blockOutputPeak), std::memory_order_relaxed);
 }
