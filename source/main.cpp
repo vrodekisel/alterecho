@@ -56,7 +56,7 @@ public:
             voiceButton.setButtonText(isEnabled ? "voice on" : "voice off");
         };
 
-        bypassButton.setButtonText("bypass off");
+        bypassButton.setButtonText("effects on");
         bypassButton.setClickingTogglesState(true);
         bypassButton.setToggleState(false, juce::dontSendNotification);
         bypassButton.onClick = [this]
@@ -64,7 +64,7 @@ public:
             auto isEnabled = bypassButton.getToggleState();
 
             audioEngine.setEffectsBypassed(isEnabled);
-            bypassButton.setButtonText(isEnabled ? "bypass on" : "bypass off");
+            bypassButton.setButtonText(isEnabled ? "effects off" : "effects on");
         };
 
         echoButton.setButtonText("echo off");

@@ -16,6 +16,7 @@ target_sources(alterecho
     PRIVATE
         source/main.cpp
         source/audio_engine.cpp
+        source/echo_effect.cpp
 )
 
 target_compile_definitions(alterecho
