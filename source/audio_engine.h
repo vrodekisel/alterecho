@@ -33,6 +33,8 @@ public:
     );
 
 private:
+    static float softLimit(float sample);
+
     std::atomic<float> inputGain { 1.0f };
     std::atomic<float> outputGain { 1.0f };
     std::atomic<bool> voiceEnabled { false };

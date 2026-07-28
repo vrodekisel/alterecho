@@ -1,5 +1,7 @@
 #include "audio_engine.h"
 
+#include <cmath>
+
 void AudioEngine::prepareToPlay(double sampleRate)
 {
     echoEffect.prepareToPlay(sampleRate);
@@ -73,6 +75,21 @@ float AudioEngine::getInputLevel() const
 float AudioEngine::getOutputLevel() const
 {
     return outputLevel.load(std::memory_order_relaxed);
+}
+
+float AudioEngine::softLimit(float sample)
+{
+    constexpr auto threshold = 0.95f;
+    auto magnitude = std::abs(sample);
+
+    if (magnitude <= threshold)
+        return sample;
+
+    auto excess = magnitude - threshold;
+    auto limitedMagnitude = threshold
+        + (1.0f - threshold) * (1.0f - std::exp(-excess / (1.0f - threshold)));
+
+    return std::copysign(limitedMagnitude, sample);
 }
 
 void AudioEngine::processBlock(
@@ -149,11 +166,7 @@ void AudioEngine::processBlock(
 
             outputSample *= currentOutputGain;
 
-            outputData[sample] = juce::jlimit(
-                -1.0f,
-                1.0f,
-                outputSample
-            );
+            outputData[sample] = softLimit(outputSample);
 
             blockOutputPeak = juce::jmax(
                 blockOutputPeak,
