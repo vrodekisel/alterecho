@@ -19,6 +19,7 @@ public:
     float getMix() const;
 
     float processSample(float inputSample, int channel);
+    void advance();
 
 private:
     static constexpr double maxDelaySeconds = 2.0;

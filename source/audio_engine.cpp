@@ -72,46 +72,61 @@ void AudioEngine::processBlock(
     auto maxInputChannels = activeInputChannels.getHighestBit() + 1;
     auto maxOutputChannels = activeOutputChannels.getHighestBit() + 1;
 
+    auto firstInputChannel = -1;
+
+    for (int channel = 0; channel < maxInputChannels; ++channel)
+    {
+        if (activeInputChannels[channel])
+        {
+            firstInputChannel = channel;
+            break;
+        }
+    }
+
+    if (firstInputChannel < 0)
+    {
+        bufferToFill.clearActiveBufferRegion();
+        return;
+    }
+
     auto currentGain = getOutputGain();
     auto effectsAreBypassed = areEffectsBypassed();
 
-    for (int channel = 0; channel < maxOutputChannels; ++channel)
+    for (int sample = 0; sample < bufferToFill.numSamples; ++sample)
     {
-        if (!activeOutputChannels[channel])
-            continue;
-
-        auto* outputData = bufferToFill.buffer->getWritePointer(
-            channel,
-            bufferToFill.startSample
-        );
-
-        if (channel < maxInputChannels && activeInputChannels[channel])
+        for (int channel = 0; channel < maxOutputChannels; ++channel)
         {
+            if (!activeOutputChannels[channel])
+                continue;
+
+            auto inputChannel = firstInputChannel;
+
+            if (channel < maxInputChannels && activeInputChannels[channel])
+                inputChannel = channel;
+
             auto* inputData = bufferToFill.buffer->getReadPointer(
+                inputChannel,
+                bufferToFill.startSample
+            );
+
+            auto* outputData = bufferToFill.buffer->getWritePointer(
                 channel,
                 bufferToFill.startSample
             );
 
-            for (int sample = 0; sample < bufferToFill.numSamples; ++sample)
-            {
-                auto outputSample = inputData[sample] * currentGain;
+            auto outputSample = inputData[sample] * currentGain;
 
-                if (!effectsAreBypassed)
-                    outputSample = echoEffect.processSample(outputSample, channel);
+            if (!effectsAreBypassed)
+                outputSample = echoEffect.processSample(outputSample, channel);
 
-                outputData[sample] = juce::jlimit(
-                    -1.0f,
-                    1.0f,
-                    outputSample
-                );
-            }
-        }
-        else
-        {
-            juce::FloatVectorOperations::clear(
-                outputData,
-                bufferToFill.numSamples
+            outputData[sample] = juce::jlimit(
+                -1.0f,
+                1.0f,
+                outputSample
             );
         }
+
+        if (!effectsAreBypassed)
+            echoEffect.advance();
     }
 }

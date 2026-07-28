@@ -90,10 +90,16 @@ float EchoEffect::processSample(float inputSample, int channel)
         ? inputSample + delayedSample * getFeedback()
         : inputSample;
 
+    return outputSample;
+}
+
+void EchoEffect::advance()
+{
+    if (delayBuffer.getNumSamples() == 0)
+        return;
+
     ++delayWritePosition;
 
     if (delayWritePosition >= delayBuffer.getNumSamples())
         delayWritePosition = 0;
-
-    return outputSample;
 }
