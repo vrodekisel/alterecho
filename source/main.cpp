@@ -1,6 +1,7 @@
 #include <juce_audio_utils/juce_audio_utils.h>
 #include <juce_gui_extra/juce_gui_extra.h>
-#include <atomic>
+
+#include "audio_engine.h"
 
 class MainComponent final : public juce::AudioAppComponent
 {
@@ -38,12 +39,10 @@ public:
         gainSlider.setRange(0.0, 4.0, 0.01);
         gainSlider.setValue(2.0);
         gainSlider.setTextValueSuffix("x");
+
         gainSlider.onValueChange = [this]
         {
-            outputGain.store(
-                static_cast<float>(gainSlider.getValue()),
-                std::memory_order_relaxed
-            );
+            audioEngine.setOutputGain(static_cast<float>(gainSlider.getValue()));
         };
 
         voiceButton.setButtonText("voice off");
@@ -53,7 +52,7 @@ public:
         {
             auto isEnabled = voiceButton.getToggleState();
 
-            voiceEnabled.store(isEnabled, std::memory_order_relaxed);
+            audioEngine.setVoiceEnabled(isEnabled);
             voiceButton.setButtonText(isEnabled ? "voice on" : "voice off");
         };
 
@@ -87,61 +86,10 @@ public:
             return;
         }
 
-        if (!voiceEnabled.load(std::memory_order_relaxed))
-        {
-            bufferToFill.clearActiveBufferRegion();
-            return;
-        }
-
-        auto activeInputChannels = device->getActiveInputChannels();
-        auto activeOutputChannels = device->getActiveOutputChannels();
-
-        auto maxInputChannels = activeInputChannels.getHighestBit() + 1;
-        auto maxOutputChannels = activeOutputChannels.getHighestBit() + 1;
-
-        for (int channel = 0; channel < maxOutputChannels; ++channel)
-        {
-            if (!activeOutputChannels[channel])
-                continue;
-
-            auto* outputData = bufferToFill.buffer->getWritePointer(
-                channel,
-                bufferToFill.startSample
-            );
-
-            if (channel < maxInputChannels && activeInputChannels[channel])
-            {
-                auto* inputData = bufferToFill.buffer->getReadPointer(
-                    channel,
-                    bufferToFill.startSample
-                );
-
-                auto currentGain = outputGain.load(std::memory_order_relaxed);
-
-                for (int sample = 0; sample < bufferToFill.numSamples; ++sample)
-                {
-                    auto boostedSample = inputData[sample] * currentGain;
-
-                    outputData[sample] = juce::jlimit(
-                        -1.0f,
-                        1.0f,
-                        boostedSample
-                    );
-                }
-            }
-            else
-            {
-                juce::FloatVectorOperations::clear(
-                    outputData,
-                    bufferToFill.numSamples
-                );
-            }
-        }
+        audioEngine.processBlock(bufferToFill, *device);
     }
 
-    void releaseResources() override
-    {
-    }
+    void releaseResources() override {}
 
     void paint(juce::Graphics& g) override
     {
@@ -235,8 +183,7 @@ public:
 private:
     bool showingSettings = false;
 
-    std::atomic<float> outputGain { 2.0f };
-    std::atomic<bool> voiceEnabled { false };
+    AudioEngine audioEngine;
 
     juce::DrawableButton navigationButton {
         "navigation",

@@ -15,6 +15,7 @@ juce_add_gui_app(alterecho
 target_sources(alterecho
     PRIVATE
         source/main.cpp
+        source/audio_engine.cpp
 )
 
 target_compile_definitions(alterecho
