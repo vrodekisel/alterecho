@@ -34,9 +34,21 @@ public:
             );
         };
 
+        voiceButton.setButtonText("voice off");
+        voiceButton.setClickingTogglesState(true);
+        voiceButton.setToggleState(false, juce::dontSendNotification);
+        voiceButton.onClick = [this]
+        {
+            auto isEnabled = voiceButton.getToggleState();
+
+            voiceEnabled.store(isEnabled, std::memory_order_relaxed);
+            voiceButton.setButtonText(isEnabled ? "voice on" : "voice off");
+        };
+
         gainLabel.setText("volume", juce::dontSendNotification);
         gainLabel.attachToComponent(&gainSlider, true);
 
+        addAndMakeVisible(voiceButton);
         addAndMakeVisible(gainSlider);
         addAndMakeVisible(gainLabel);
 
@@ -57,6 +69,12 @@ public:
         auto* device = deviceManager.getCurrentAudioDevice();
 
         if (device == nullptr)
+        {
+            bufferToFill.clearActiveBufferRegion();
+            return;
+        }
+
+        if (!voiceEnabled.load(std::memory_order_relaxed))
         {
             bufferToFill.clearActiveBufferRegion();
             return;
@@ -127,9 +145,13 @@ public:
         auto bounds = getLocalBounds().reduced(24);
         bounds.removeFromTop(56);
 
-        auto gainArea = bounds.removeFromTop(40);
-        gainArea.removeFromLeft(120);
-        gainSlider.setBounds(gainArea);
+        auto controlsArea = bounds.removeFromTop(40);
+
+        voiceButton.setBounds(controlsArea.removeFromLeft(120));
+
+        controlsArea.removeFromLeft(24);
+        controlsArea.removeFromLeft(120);
+        gainSlider.setBounds(controlsArea);
 
         bounds.removeFromTop(24);
 
@@ -138,8 +160,11 @@ public:
     }
 
 private:
+    private:
     std::atomic<float> outputGain { 2.0f };
+    std::atomic<bool> voiceEnabled { false };
 
+    juce::TextButton voiceButton;
     juce::Slider gainSlider;
     juce::Label gainLabel;
 
