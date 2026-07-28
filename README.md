@@ -1,3 +1,3 @@
 # alterecho
 
-alterecho — Windows-приложение в разработке для realtime-обработки и изменения голоса.
+alterecho is a windows application currently under development for real-time voice processing and modification.
