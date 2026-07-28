@@ -56,12 +56,62 @@ public:
             voiceButton.setButtonText(isEnabled ? "voice on" : "voice off");
         };
 
+        echoButton.setButtonText("echo off");
+        echoButton.setClickingTogglesState(true);
+        echoButton.setToggleState(false, juce::dontSendNotification);
+        echoButton.onClick = [this]
+        {
+            auto isEnabled = echoButton.getToggleState();
+
+            audioEngine.setEchoEnabled(isEnabled);
+            echoButton.setButtonText(isEnabled ? "echo on" : "echo off");
+        };
+
+        delaySlider.setRange(1.0, 2000.0, 1.0);
+        delaySlider.setValue(350.0);
+        delaySlider.setTextValueSuffix(" ms");
+        delaySlider.onValueChange = [this]
+        {
+            audioEngine.setEchoDelayMs(static_cast<float>(delaySlider.getValue()));
+        };
+
+        feedbackSlider.setRange(0.0, 0.95, 0.01);
+        feedbackSlider.setValue(0.35);
+        feedbackSlider.onValueChange = [this]
+        {
+            audioEngine.setEchoFeedback(static_cast<float>(feedbackSlider.getValue()));
+        };
+
+        mixSlider.setRange(0.0, 1.0, 0.01);
+        mixSlider.setValue(0.35);
+        mixSlider.onValueChange = [this]
+        {
+            audioEngine.setEchoMix(static_cast<float>(mixSlider.getValue()));
+        };
+
         gainLabel.setText("volume", juce::dontSendNotification);
         gainLabel.attachToComponent(&gainSlider, true);
+
+        delayLabel.setText("delay", juce::dontSendNotification);
+        delayLabel.attachToComponent(&delaySlider, true);
+
+        feedbackLabel.setText("feedback", juce::dontSendNotification);
+        feedbackLabel.attachToComponent(&feedbackSlider, true);
+
+        mixLabel.setText("mix", juce::dontSendNotification);
+        mixLabel.attachToComponent(&mixSlider, true);
 
         addAndMakeVisible(voiceButton);
         addAndMakeVisible(gainSlider);
         addAndMakeVisible(gainLabel);
+
+        addAndMakeVisible(echoButton);
+        addAndMakeVisible(delaySlider);
+        addAndMakeVisible(delayLabel);
+        addAndMakeVisible(feedbackSlider);
+        addAndMakeVisible(feedbackLabel);
+        addAndMakeVisible(mixSlider);
+        addAndMakeVisible(mixLabel);
 
         updateScreenVisibility();
         resized();
@@ -72,8 +122,9 @@ public:
         shutdownAudio();
     }
 
-    void prepareToPlay(int, double) override
+    void prepareToPlay(int, double sampleRate) override
     {
+        audioEngine.prepareToPlay(sampleRate);
     }
 
     void getNextAudioBlock(const juce::AudioSourceChannelInfo& bufferToFill) override
@@ -118,7 +169,7 @@ public:
 
         auto controlsArea = bounds.withSizeKeepingCentre(
             juce::jmin(700, bounds.getWidth()),
-            128
+            320
         );
 
         auto voiceArea = controlsArea.removeFromTop(44);
@@ -129,6 +180,29 @@ public:
         auto gainArea = controlsArea.removeFromTop(40);
         gainArea.removeFromLeft(120);
         gainSlider.setBounds(gainArea);
+
+        controlsArea.removeFromTop(28);
+
+        auto echoArea = controlsArea.removeFromTop(44);
+        echoButton.setBounds(echoArea.withSizeKeepingCentre(160, 40));
+
+        controlsArea.removeFromTop(28);
+
+        auto delayArea = controlsArea.removeFromTop(40);
+        delayArea.removeFromLeft(120);
+        delaySlider.setBounds(delayArea);
+
+        controlsArea.removeFromTop(20);
+
+        auto feedbackArea = controlsArea.removeFromTop(40);
+        feedbackArea.removeFromLeft(120);
+        feedbackSlider.setBounds(feedbackArea);
+
+        controlsArea.removeFromTop(20);
+
+        auto mixArea = controlsArea.removeFromTop(40);
+        mixArea.removeFromLeft(120);
+        mixSlider.setBounds(mixArea);
     }
 
     void configureNavigationIcons()
@@ -176,6 +250,14 @@ public:
         gainSlider.setVisible(!showingSettings);
         gainLabel.setVisible(!showingSettings);
 
+        echoButton.setVisible(!showingSettings);
+        delaySlider.setVisible(!showingSettings);
+        delayLabel.setVisible(!showingSettings);
+        feedbackSlider.setVisible(!showingSettings);
+        feedbackLabel.setVisible(!showingSettings);
+        mixSlider.setVisible(!showingSettings);
+        mixLabel.setVisible(!showingSettings);
+
         if (deviceSelector != nullptr)
             deviceSelector->setVisible(showingSettings);
     }
@@ -196,6 +278,14 @@ private:
     juce::TextButton voiceButton;
     juce::Slider gainSlider;
     juce::Label gainLabel;
+
+    juce::TextButton echoButton;
+    juce::Slider delaySlider;
+    juce::Label delayLabel;
+    juce::Slider feedbackSlider;
+    juce::Label feedbackLabel;
+    juce::Slider mixSlider;
+    juce::Label mixLabel;
 
     std::unique_ptr<juce::AudioDeviceSelectorComponent> deviceSelector;
 
