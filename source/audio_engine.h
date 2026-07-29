@@ -6,6 +6,7 @@
 #include "echo_effect.h"
 #include "voice_profile.h"
 #include "tone_effect.h"
+#include "robot_effect.h"
 
 class AudioEngine
 {
@@ -43,4 +44,5 @@ private:
 
     EchoEffect echoEffect;
     ToneEffect toneEffect;
+    RobotEffect robotEffect;
 };

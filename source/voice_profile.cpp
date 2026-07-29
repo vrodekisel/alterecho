@@ -65,6 +65,30 @@ TechnicalVoiceParameters makeNarratorParameters(const std::vector<float>& contro
     return parameters;
 }
 
+TechnicalVoiceParameters makeRobotParameters(const std::vector<float>& controlValues)
+{
+    auto tone = controlValues.size() > 0 ? controlValues[0] : 0.5f;
+    auto depth = controlValues.size() > 1 ? controlValues[1] : 0.72f;
+    auto amount = controlValues.size() > 2 ? controlValues[2] : 0.72f;
+    auto mix = controlValues.size() > 3 ? controlValues[3] : 0.58f;
+
+    TechnicalVoiceParameters parameters;
+    parameters.toneEnabled = amount > 0.01f;
+    parameters.highPassHz = juce::jmap(tone, 90.0f, 420.0f);
+    parameters.lowPassHz = juce::jmap(tone, 2600.0f, 7200.0f);
+    parameters.drive = juce::jlimit(0.0f, 0.28f, amount * 0.28f);
+    parameters.compression = juce::jlimit(0.0f, 0.5f, amount * 0.5f);
+
+    parameters.robotEnabled = amount > 0.01f && mix > 0.01f;
+    parameters.robotFrequencyHz = juce::jmap(tone, 18.0f, 96.0f);
+    parameters.robotDepth = juce::jlimit(0.0f, 1.0f, depth * amount);
+    parameters.robotCrush = juce::jlimit(0.0f, 0.75f, amount * 0.75f);
+    parameters.robotMix = juce::jlimit(0.0f, 0.95f, mix);
+    parameters.robotPitchShiftSemitones = juce::jmap(amount, 1.2f, 3.2f);
+
+    return parameters;
+}
+
 }
 
 juce::String getVoiceProfileKey(VoiceProfileId id)
@@ -278,6 +302,9 @@ TechnicalVoiceParameters mapVoiceProfileToTechnicalParameters(
 
     if (profile.id == VoiceProfileId::narrator)
         return makeNarratorParameters(controlValues);
+
+    if (profile.id == VoiceProfileId::robot)
+        return makeRobotParameters(controlValues);
 
     return makeInactiveEffectParameters();
 }

@@ -50,6 +50,12 @@ struct TechnicalVoiceParameters
     float noise = 0.0f;
     float body = 0.0f;
     float presence = 0.0f;
+    bool robotEnabled = false;
+    float robotFrequencyHz = 42.0f;
+    float robotDepth = 0.0f;
+    float robotCrush = 0.0f;
+    float robotMix = 0.0f;
+    float robotPitchShiftSemitones = 0.0f;
 };
 
 struct VoiceProfile

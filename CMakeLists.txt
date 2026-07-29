@@ -19,6 +19,7 @@ target_sources(alterecho
         source/echo_effect.cpp
         source/voice_profile.cpp
         source/tone_effect.cpp
+        source/robot_effect.cpp
 )
 
 target_compile_definitions(alterecho

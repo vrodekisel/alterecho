@@ -6,6 +6,7 @@ void AudioEngine::prepareToPlay(double sampleRate)
 {
     echoEffect.prepareToPlay(sampleRate);
     toneEffect.prepareToPlay(sampleRate);
+    robotEffect.prepareToPlay(sampleRate);
 }
 
 void AudioEngine::setVoiceEnabled(bool shouldBeEnabled)
@@ -42,6 +43,12 @@ void AudioEngine::setVoiceProfileParameters(const TechnicalVoiceParameters& para
     toneEffect.setNoise(parameters.noise);
     toneEffect.setBody(parameters.body);
     toneEffect.setPresence(parameters.presence);
+    robotEffect.setEnabled(parameters.robotEnabled);
+    robotEffect.setFrequencyHz(parameters.robotFrequencyHz);
+    robotEffect.setDepth(parameters.robotDepth);
+    robotEffect.setCrush(parameters.robotCrush);
+    robotEffect.setMix(parameters.robotMix);
+    robotEffect.setPitchShiftSemitones(parameters.robotPitchShiftSemitones);
 }
 
 bool AudioEngine::isVoiceEnabled() const
@@ -162,6 +169,7 @@ void AudioEngine::processBlock(
             if (!effectsAreBypassed)
             {
                 outputSample = toneEffect.processSample(outputSample, channel);
+                outputSample = robotEffect.processSample(outputSample, channel);
                 outputSample = echoEffect.processSample(outputSample, channel);
             }
 
