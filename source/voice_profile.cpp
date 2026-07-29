@@ -98,7 +98,8 @@ TechnicalVoiceParameters makeMonsterParameters(const std::vector<float>& control
 
     TechnicalVoiceParameters parameters;
     parameters.voiceShiftEnabled = amount > 0.01f;
-    parameters.pitchShiftSemitones = juce::jmap(depth, -3.0f, -7.0f) * amount;
+    parameters.pitchShiftSemitones = juce::jmap(depth, -4.0f, -8.5f)
+        * juce::jmap(amount, 0.65f, 1.0f);
     parameters.formantShiftSemitones = juce::jmap(depth, -2.0f, -5.5f) * amount;
     parameters.formantMix = 0.0f;
     parameters.voiceShiftMix = juce::jlimit(0.0f, 0.72f, (0.32f + depth * 0.44f) * amount);

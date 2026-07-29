@@ -61,6 +61,11 @@ struct TechnicalVoiceParameters
     float formantShiftSemitones = 0.0f;
     float formantMix = 0.0f;
     float voiceShiftMix = 1.0f;
+    bool pitchTrackingEnabled = false;
+    float targetPitchHz = 0.0f;
+    float pitchTrackingMix = 0.0f;
+    float minPitchShiftSemitones = -24.0f;
+    float maxPitchShiftSemitones = 24.0f;
 };
 
 struct VoiceProfile

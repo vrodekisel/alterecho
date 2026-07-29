@@ -57,6 +57,13 @@ void AudioEngine::setVoiceProfileParameters(const TechnicalVoiceParameters& para
     voiceShiftEffect.setFormantShiftSemitones(parameters.formantShiftSemitones);
     voiceShiftEffect.setFormantMix(parameters.formantMix);
     voiceShiftEffect.setMix(parameters.voiceShiftMix);
+    voiceShiftEffect.setPitchTrackingEnabled(parameters.pitchTrackingEnabled);
+    voiceShiftEffect.setTargetPitchHz(parameters.targetPitchHz);
+    voiceShiftEffect.setPitchTrackingMix(parameters.pitchTrackingMix);
+    voiceShiftEffect.setPitchShiftRange(
+        parameters.minPitchShiftSemitones,
+        parameters.maxPitchShiftSemitones
+    );
 }
 
 bool AudioEngine::isVoiceEnabled() const
