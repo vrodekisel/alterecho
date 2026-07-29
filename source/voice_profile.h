@@ -46,6 +46,10 @@ struct TechnicalVoiceParameters
     float highPassHz = 80.0f;
     float lowPassHz = 16000.0f;
     float drive = 0.0f;
+    float compression = 0.0f;
+    float noise = 0.0f;
+    float body = 0.0f;
+    float presence = 0.0f;
 };
 
 struct VoiceProfile

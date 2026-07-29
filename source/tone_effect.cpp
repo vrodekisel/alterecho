@@ -13,6 +13,12 @@ void ToneEffect::prepareToPlay(double sampleRate)
     for (auto& filter : lowPassFilters)
         filter.reset();
 
+    for (auto& filter : bodyFilters)
+        filter.reset();
+
+    for (auto& filter : presenceFilters)
+        filter.reset();
+
     envelope[0] = 0.0f;
     envelope[1] = 0.0f;
     crackleEnvelope[0] = 0.0f;
@@ -53,6 +59,16 @@ void ToneEffect::setNoise(float amount)
     noise.store(juce::jlimit(0.0f, 1.0f, amount), std::memory_order_relaxed);
 }
 
+void ToneEffect::setBody(float amount)
+{
+    body.store(juce::jlimit(0.0f, 1.0f, amount), std::memory_order_relaxed);
+}
+
+void ToneEffect::setPresence(float amount)
+{
+    presence.store(juce::jlimit(0.0f, 1.0f, amount), std::memory_order_relaxed);
+}
+
 float ToneEffect::processSample(float inputSample, int channel)
 {
     if (!enabled.load(std::memory_order_relaxed))
@@ -61,6 +77,24 @@ float ToneEffect::processSample(float inputSample, int channel)
     auto filterChannel = channel % 2;
     auto sample = highPassFilters[filterChannel].processSample(inputSample);
     sample = lowPassFilters[filterChannel].processSample(sample);
+    auto toneSample = sample;
+
+    auto bodyAmount = body.load(std::memory_order_relaxed);
+
+    if (bodyAmount > 0.0f)
+    {
+        auto bodySample = bodyFilters[filterChannel].processSample(toneSample);
+        sample += bodySample * juce::jmap(bodyAmount, 0.0f, 0.34f);
+    }
+
+    auto presenceAmount = presence.load(std::memory_order_relaxed);
+
+    if (presenceAmount > 0.0f)
+    {
+        auto presenceSample = presenceFilters[filterChannel].processSample(toneSample);
+        sample += presenceSample * juce::jmap(presenceAmount, 0.0f, 0.26f);
+    }
+
     auto magnitude = std::abs(sample);
 
     auto attack = 1.0f - std::exp(-1.0f / static_cast<float>(0.005 * currentSampleRate));
@@ -150,9 +184,27 @@ void ToneEffect::updateFilters()
         lp
     );
 
+    auto bodyCoefficients = juce::dsp::IIR::Coefficients<float>::makeBandPass(
+        currentSampleRate,
+        180.0f,
+        0.8f
+    );
+
+    auto presenceCoefficients = juce::dsp::IIR::Coefficients<float>::makeBandPass(
+        currentSampleRate,
+        3200.0f,
+        0.9f
+    );
+
     for (auto& filter : highPassFilters)
         filter.coefficients = highPassCoefficients;
 
     for (auto& filter : lowPassFilters)
         filter.coefficients = lowPassCoefficients;
+
+    for (auto& filter : bodyFilters)
+        filter.coefficients = bodyCoefficients;
+
+    for (auto& filter : presenceFilters)
+        filter.coefficients = presenceCoefficients;
 }

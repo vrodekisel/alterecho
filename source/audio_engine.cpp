@@ -38,6 +38,10 @@ void AudioEngine::setVoiceProfileParameters(const TechnicalVoiceParameters& para
     toneEffect.setHighPassHz(parameters.highPassHz);
     toneEffect.setLowPassHz(parameters.lowPassHz);
     toneEffect.setDrive(parameters.drive);
+    toneEffect.setCompression(parameters.compression);
+    toneEffect.setNoise(parameters.noise);
+    toneEffect.setBody(parameters.body);
+    toneEffect.setPresence(parameters.presence);
 }
 
 bool AudioEngine::isVoiceEnabled() const
@@ -160,8 +164,6 @@ void AudioEngine::processBlock(
                 outputSample = toneEffect.processSample(outputSample, channel);
                 outputSample = echoEffect.processSample(outputSample, channel);
             }
-            if (!effectsAreBypassed)
-                outputSample = echoEffect.processSample(outputSample, channel);
 
             outputSample *= currentOutputGain;
 

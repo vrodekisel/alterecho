@@ -45,6 +45,26 @@ TechnicalVoiceParameters makeRadioParameters(const std::vector<float>& controlVa
     return parameters;
 }
 
+TechnicalVoiceParameters makeNarratorParameters(const std::vector<float>& controlValues)
+{
+    auto tone = controlValues.size() > 0 ? controlValues[0] : 0.45f;
+    auto depth = controlValues.size() > 1 ? controlValues[1] : 0.52f;
+    auto brightness = controlValues.size() > 2 ? controlValues[2] : 0.52f;
+    auto amount = controlValues.size() > 3 ? controlValues[3] : 0.42f;
+
+    TechnicalVoiceParameters parameters;
+    parameters.toneEnabled = amount > 0.01f;
+
+    parameters.highPassHz = juce::jmap(tone, 65.0f, 145.0f);
+    parameters.lowPassHz = juce::jmap(brightness, 7600.0f, 14500.0f);
+    parameters.compression = juce::jlimit(0.0f, 0.58f, depth * amount);
+    parameters.drive = juce::jlimit(0.0f, 0.12f, amount * 0.12f);
+    parameters.body = juce::jlimit(0.0f, 0.55f, depth * amount);
+    parameters.presence = juce::jlimit(0.0f, 0.52f, brightness * amount);
+
+    return parameters;
+}
+
 }
 
 juce::String getVoiceProfileKey(VoiceProfileId id)
@@ -255,6 +275,9 @@ TechnicalVoiceParameters mapVoiceProfileToTechnicalParameters(
 
     if (profile.id == VoiceProfileId::radio)
         return makeRadioParameters(controlValues);
+
+    if (profile.id == VoiceProfileId::narrator)
+        return makeNarratorParameters(controlValues);
 
     return makeInactiveEffectParameters();
 }

@@ -15,6 +15,8 @@ public:
     void setDrive(float amount);
     void setCompression(float amount);
     void setNoise(float amount);
+    void setBody(float amount);
+    void setPresence(float amount);
 
     float processSample(float inputSample, int channel);
 
@@ -27,6 +29,8 @@ private:
     std::atomic<float> drive { 0.0f };
     std::atomic<float> compression { 0.0f };
     std::atomic<float> noise { 0.0f };
+    std::atomic<float> body { 0.0f };
+    std::atomic<float> presence { 0.0f };
 
     double currentSampleRate = 44100.0;
     float envelope[2] { 0.0f, 0.0f };
@@ -36,4 +40,6 @@ private:
 
     juce::dsp::IIR::Filter<float> highPassFilters[2];
     juce::dsp::IIR::Filter<float> lowPassFilters[2];
+    juce::dsp::IIR::Filter<float> bodyFilters[2];
+    juce::dsp::IIR::Filter<float> presenceFilters[2];
 };
