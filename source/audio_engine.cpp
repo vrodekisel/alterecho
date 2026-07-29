@@ -38,8 +38,6 @@ void AudioEngine::setVoiceProfileParameters(const TechnicalVoiceParameters& para
     toneEffect.setHighPassHz(parameters.highPassHz);
     toneEffect.setLowPassHz(parameters.lowPassHz);
     toneEffect.setDrive(parameters.drive);
-    toneEffect.setCompression(parameters.compression);
-    toneEffect.setNoise(parameters.noise);
 }
 
 bool AudioEngine::isVoiceEnabled() const
@@ -92,6 +90,7 @@ void AudioEngine::processBlock(
     const juce::AudioIODevice& device
 )
 {
+
     if (!isVoiceEnabled())
     {
         inputLevel.store(0.0f, std::memory_order_relaxed);
@@ -155,12 +154,14 @@ void AudioEngine::processBlock(
 
             auto outputSample = inputData[sample] * currentInputGain;
             blockInputPeak = juce::jmax(blockInputPeak, std::abs(outputSample));
-
+            
             if (!effectsAreBypassed)
             {
                 outputSample = toneEffect.processSample(outputSample, channel);
                 outputSample = echoEffect.processSample(outputSample, channel);
             }
+            if (!effectsAreBypassed)
+                outputSample = echoEffect.processSample(outputSample, channel);
 
             outputSample *= currentOutputGain;
 

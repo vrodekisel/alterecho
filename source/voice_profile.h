@@ -38,17 +38,14 @@ struct VoiceControl
 
 struct TechnicalVoiceParameters
 {
-    bool toneEnabled = false;
-    float highPassHz = 80.0f;
-    float lowPassHz = 16000.0f;
-    float drive = 0.0f;
-    float compression = 0.0f;
-    float noise = 0.0f;
-
     bool echoEnabled = false;
     float echoDelayMs = 350.0f;
     float echoFeedback = 0.0f;
     float echoMix = 0.0f;
+    bool toneEnabled = false;
+    float highPassHz = 80.0f;
+    float lowPassHz = 16000.0f;
+    float drive = 0.0f;
 };
 
 struct VoiceProfile
