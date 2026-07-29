@@ -3,6 +3,7 @@
 #include <juce_audio_basics/juce_audio_basics.h>
 
 #include <atomic>
+#include <vector>
 
 class VoiceShiftEffect
 {
@@ -23,6 +24,8 @@ public:
 
 private:
     void updateSmoothedParameters(int numSamples);
+    float processPitchShiftSample(float inputSample, int channel, float semitones);
+    float readPitchBuffer(int channel, float delaySamples) const;
 
     std::atomic<bool> enabled { false };
     std::atomic<float> pitchShiftSemitones { 0.0f };
@@ -32,6 +35,10 @@ private:
 
     double currentSampleRate = 44100.0;
     int currentMaximumBlockSize = 512;
+    float pitchPhase[2] { 0.0f, 0.5f };
+    int pitchWriteIndex[2] { 0, 0 };
+    int pitchSamplesWritten[2] { 0, 0 };
+    std::vector<float> pitchBuffer[2];
 
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedPitchShiftSemitones;
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedFormantShiftSemitones;

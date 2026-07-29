@@ -89,6 +89,36 @@ TechnicalVoiceParameters makeRobotParameters(const std::vector<float>& controlVa
     return parameters;
 }
 
+TechnicalVoiceParameters makeMonsterParameters(const std::vector<float>& controlValues)
+{
+    auto tone = controlValues.size() > 0 ? controlValues[0] : 0.24f;
+    auto depth = controlValues.size() > 1 ? controlValues[1] : 0.86f;
+    auto amount = controlValues.size() > 2 ? controlValues[2] : 0.74f;
+    auto mix = controlValues.size() > 3 ? controlValues[3] : 0.38f;
+
+    TechnicalVoiceParameters parameters;
+    parameters.voiceShiftEnabled = amount > 0.01f;
+    parameters.pitchShiftSemitones = juce::jmap(depth, -3.0f, -7.0f) * amount;
+    parameters.formantShiftSemitones = juce::jmap(depth, -2.0f, -5.5f) * amount;
+    parameters.formantMix = 0.0f;
+    parameters.voiceShiftMix = juce::jlimit(0.0f, 0.72f, (0.32f + depth * 0.44f) * amount);
+
+    parameters.toneEnabled = amount > 0.01f;
+    parameters.highPassHz = juce::jmap(tone, 45.0f, 145.0f);
+    parameters.lowPassHz = juce::jmap(tone, 1900.0f, 5200.0f);
+    parameters.drive = juce::jlimit(0.0f, 0.22f, amount * 0.22f);
+    parameters.compression = juce::jlimit(0.0f, 0.46f, depth * amount * 0.55f);
+    parameters.body = juce::jlimit(0.0f, 0.72f, (0.28f + depth * 0.55f) * amount);
+    parameters.presence = juce::jlimit(0.0f, 0.08f, tone * amount * 0.08f);
+
+    parameters.echoEnabled = amount > 0.01f && mix > 0.01f;
+    parameters.echoDelayMs = juce::jmap(tone, 55.0f, 115.0f);
+    parameters.echoFeedback = juce::jlimit(0.0f, 0.1f, mix * amount * 0.18f);
+    parameters.echoMix = juce::jlimit(0.0f, 0.055f, mix * amount * 0.12f);
+
+    return parameters;
+}
+
 }
 
 juce::String getVoiceProfileKey(VoiceProfileId id)
@@ -305,6 +335,9 @@ TechnicalVoiceParameters mapVoiceProfileToTechnicalParameters(
 
     if (profile.id == VoiceProfileId::robot)
         return makeRobotParameters(controlValues);
+
+    if (profile.id == VoiceProfileId::monster)
+        return makeMonsterParameters(controlValues);
 
     return makeInactiveEffectParameters();
 }
