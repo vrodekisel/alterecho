@@ -26,6 +26,25 @@ TechnicalVoiceParameters makeEchoParameters(const std::vector<float>& controlVal
     parameters.echoMix = juce::jlimit(0.0f, 0.62f, juce::jmap(mix, 0.0f, 0.62f));
     return parameters;
 }
+TechnicalVoiceParameters makeRadioParameters(const std::vector<float>& controlValues)
+{
+    auto tone = controlValues.size() > 0 ? controlValues[0] : 0.5f;
+    auto brightness = controlValues.size() > 1 ? controlValues[1] : 0.58f;
+    auto amount = controlValues.size() > 2 ? controlValues[2] : 0.5f;
+    auto mix = controlValues.size() > 3 ? controlValues[3] : 0.35f;
+
+    TechnicalVoiceParameters parameters;
+    parameters.toneEnabled = amount > 0.01f;
+
+    parameters.highPassHz = juce::jmap(tone, 240.0f, 860.0f);
+    parameters.lowPassHz = juce::jmap(brightness, 1450.0f, 4300.0f);
+    parameters.drive = juce::jlimit(0.0f, 0.72f, amount * 0.72f);
+    parameters.compression = juce::jlimit(0.0f, 0.86f, amount * 0.86f);
+    parameters.noise = juce::jlimit(0.0f, 0.92f, mix * amount * 1.28f);
+
+    return parameters;
+}
+
 }
 
 juce::String getVoiceProfileKey(VoiceProfileId id)
@@ -84,7 +103,8 @@ const std::vector<VoiceProfile>& getVoiceProfiles()
             {
                 makeControl(VoiceControlId::tone, "Tone", 0.5f),
                 makeControl(VoiceControlId::brightness, "Brightness", 0.58f),
-                makeControl(VoiceControlId::amount, "Amount", 0.5f)
+                makeControl(VoiceControlId::amount, "Amount", 0.72f),
+                makeControl(VoiceControlId::mix, "Mix", 0.48f)
             }
         },
         {
@@ -232,6 +252,9 @@ TechnicalVoiceParameters mapVoiceProfileToTechnicalParameters(
 {
     if (profile.id == VoiceProfileId::echo)
         return makeEchoParameters(controlValues);
+
+    if (profile.id == VoiceProfileId::radio)
+        return makeRadioParameters(controlValues);
 
     return makeInactiveEffectParameters();
 }

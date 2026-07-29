@@ -18,6 +18,7 @@ target_sources(alterecho
         source/audio_engine.cpp
         source/echo_effect.cpp
         source/voice_profile.cpp
+        source/tone_effect.cpp
 )
 
 target_compile_definitions(alterecho
@@ -30,4 +31,5 @@ target_link_libraries(alterecho
     PRIVATE
         juce::juce_gui_extra
         juce::juce_audio_utils
+        juce::juce_dsp
 )

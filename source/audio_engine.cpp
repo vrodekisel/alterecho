@@ -5,6 +5,7 @@
 void AudioEngine::prepareToPlay(double sampleRate)
 {
     echoEffect.prepareToPlay(sampleRate);
+    toneEffect.prepareToPlay(sampleRate);
 }
 
 void AudioEngine::setVoiceEnabled(bool shouldBeEnabled)
@@ -33,6 +34,12 @@ void AudioEngine::setVoiceProfileParameters(const TechnicalVoiceParameters& para
     echoEffect.setDelayMs(parameters.echoDelayMs);
     echoEffect.setFeedback(parameters.echoFeedback);
     echoEffect.setMix(parameters.echoMix);
+    toneEffect.setEnabled(parameters.toneEnabled);
+    toneEffect.setHighPassHz(parameters.highPassHz);
+    toneEffect.setLowPassHz(parameters.lowPassHz);
+    toneEffect.setDrive(parameters.drive);
+    toneEffect.setCompression(parameters.compression);
+    toneEffect.setNoise(parameters.noise);
 }
 
 bool AudioEngine::isVoiceEnabled() const
@@ -150,7 +157,10 @@ void AudioEngine::processBlock(
             blockInputPeak = juce::jmax(blockInputPeak, std::abs(outputSample));
 
             if (!effectsAreBypassed)
+            {
+                outputSample = toneEffect.processSample(outputSample, channel);
                 outputSample = echoEffect.processSample(outputSample, channel);
+            }
 
             outputSample *= currentOutputGain;
 

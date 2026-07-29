@@ -4,6 +4,7 @@
 #include <atomic>
 
 #include "echo_effect.h"
+#include "tone_effect.h"
 #include "voice_profile.h"
 
 class AudioEngine
@@ -40,5 +41,6 @@ private:
     std::atomic<float> inputLevel { 0.0f };
     std::atomic<float> outputLevel { 0.0f };
 
+    ToneEffect toneEffect;
     EchoEffect echoEffect;
 };
