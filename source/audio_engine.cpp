@@ -2,11 +2,14 @@
 
 #include <cmath>
 
-void AudioEngine::prepareToPlay(double sampleRate)
+void AudioEngine::prepareToPlay(double sampleRate, int maximumBlockSize)
 {
     echoEffect.prepareToPlay(sampleRate);
     toneEffect.prepareToPlay(sampleRate);
     robotEffect.prepareToPlay(sampleRate);
+    voiceShiftEffect.prepareToPlay(sampleRate, maximumBlockSize);
+    processingBuffer.setSize(2, juce::jmax(1, maximumBlockSize));
+    processingBuffer.clear();
 }
 
 void AudioEngine::setVoiceEnabled(bool shouldBeEnabled)
@@ -49,6 +52,11 @@ void AudioEngine::setVoiceProfileParameters(const TechnicalVoiceParameters& para
     robotEffect.setCrush(parameters.robotCrush);
     robotEffect.setMix(parameters.robotMix);
     robotEffect.setPitchShiftSemitones(parameters.robotPitchShiftSemitones);
+    voiceShiftEffect.setEnabled(parameters.voiceShiftEnabled);
+    voiceShiftEffect.setPitchShiftSemitones(parameters.pitchShiftSemitones);
+    voiceShiftEffect.setFormantShiftSemitones(parameters.formantShiftSemitones);
+    voiceShiftEffect.setFormantMix(parameters.formantMix);
+    voiceShiftEffect.setMix(parameters.voiceShiftMix);
 }
 
 bool AudioEngine::isVoiceEnabled() const
@@ -141,6 +149,20 @@ void AudioEngine::processBlock(
     auto blockInputPeak = 0.0f;
     auto blockOutputPeak = 0.0f;
 
+    if (processingBuffer.getNumChannels() < maxOutputChannels
+        || processingBuffer.getNumSamples() < bufferToFill.numSamples)
+    {
+        processingBuffer.setSize(
+            juce::jmax(1, maxOutputChannels),
+            juce::jmax(1, bufferToFill.numSamples),
+            false,
+            false,
+            true
+        );
+    }
+
+    processingBuffer.clear(0, bufferToFill.numSamples);
+
     for (int sample = 0; sample < bufferToFill.numSamples; ++sample)
     {
         for (int channel = 0; channel < maxOutputChannels; ++channel)
@@ -158,13 +180,28 @@ void AudioEngine::processBlock(
                 bufferToFill.startSample
             );
 
+            auto outputSample = inputData[sample] * currentInputGain;
+            blockInputPeak = juce::jmax(blockInputPeak, std::abs(outputSample));
+            processingBuffer.setSample(channel, sample, outputSample);
+        }
+    }
+
+    if (!effectsAreBypassed)
+        voiceShiftEffect.processBlock(processingBuffer, 0, bufferToFill.numSamples);
+
+    for (int sample = 0; sample < bufferToFill.numSamples; ++sample)
+    {
+        for (int channel = 0; channel < maxOutputChannels; ++channel)
+        {
+            if (!activeOutputChannels[channel])
+                continue;
+
             auto* outputData = bufferToFill.buffer->getWritePointer(
                 channel,
                 bufferToFill.startSample
             );
 
-            auto outputSample = inputData[sample] * currentInputGain;
-            blockInputPeak = juce::jmax(blockInputPeak, std::abs(outputSample));
+            auto outputSample = processingBuffer.getSample(channel, sample);
             
             if (!effectsAreBypassed)
             {

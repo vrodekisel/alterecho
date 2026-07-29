@@ -273,9 +273,9 @@ public:
         shutdownAudio();
     }
 
-    void prepareToPlay(int, double sampleRate) override
+    void prepareToPlay(int samplesPerBlockExpected, double sampleRate) override
     {
-        audioEngine.prepareToPlay(sampleRate);
+        audioEngine.prepareToPlay(sampleRate, samplesPerBlockExpected);
     }
 
     void getNextAudioBlock(const juce::AudioSourceChannelInfo& bufferToFill) override

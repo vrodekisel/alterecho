@@ -56,6 +56,11 @@ struct TechnicalVoiceParameters
     float robotCrush = 0.0f;
     float robotMix = 0.0f;
     float robotPitchShiftSemitones = 0.0f;
+    bool voiceShiftEnabled = false;
+    float pitchShiftSemitones = 0.0f;
+    float formantShiftSemitones = 0.0f;
+    float formantMix = 0.0f;
+    float voiceShiftMix = 1.0f;
 };
 
 struct VoiceProfile

@@ -7,11 +7,12 @@
 #include "voice_profile.h"
 #include "tone_effect.h"
 #include "robot_effect.h"
+#include "voice_shift_effect.h"
 
 class AudioEngine
 {
 public:
-    void prepareToPlay(double sampleRate);
+    void prepareToPlay(double sampleRate, int maximumBlockSize);
 
     void setVoiceEnabled(bool shouldBeEnabled);
     void setInputGain(float newGain);
@@ -45,4 +46,6 @@ private:
     EchoEffect echoEffect;
     ToneEffect toneEffect;
     RobotEffect robotEffect;
+    VoiceShiftEffect voiceShiftEffect;
+    juce::AudioBuffer<float> processingBuffer;
 };
